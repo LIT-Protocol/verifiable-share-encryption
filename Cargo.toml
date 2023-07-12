@@ -3,4 +3,33 @@ name = "verifiable-share-encryption"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
+[features]
+
+[dependencies.anyhow]
+version = "1.0"
+
+[dependencies.bulletproofs]
+version = "*"
+default-features = false
+features = [
+    "std",
+    "curve25519",
+    "k256",
+    "p256",
+    "bls12_381_std"
+]
+git = "https://github.com/LIT-Protocol/bulletproofs.git"
+
+[dependencies.data-encoding]
+version = "2.3"
+
+[dependencies.rand_core]
+version = "0.6"
+features = ["std"]
+
+[dependencies.serde]
+version = "1.0"
+features = ["derive"]
+
+[dependencies.thiserror]
+version = "1.0"
