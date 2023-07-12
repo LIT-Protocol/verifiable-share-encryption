@@ -16,6 +16,7 @@ features = [
     "curve25519",
     "k256",
     "p256",
+    "bls12_381",
     "bls12_381_std"
 ]
 git = "https://github.com/LIT-Protocol/bulletproofs.git"
@@ -23,9 +24,15 @@ git = "https://github.com/LIT-Protocol/bulletproofs.git"
 [dependencies.data-encoding]
 version = "2.3"
 
+[dependencies.ed25519-dalek]
+version = "2.0.0-rc.2"
+
 [dependencies.rand_core]
 version = "0.6"
 features = ["std"]
+
+[dependencies.rayon]
+version = "1.5"
 
 [dependencies.serde]
 version = "1.0"
@@ -33,3 +40,8 @@ features = ["derive"]
 
 [dependencies.thiserror]
 version = "1.0"
+
+[dev-dependencies]
+rand = "0.8"
+serde_bare = "0.5"
+serde_json = "1.0"

@@ -8,6 +8,12 @@ pub enum Error {
     DeserializedInvalidScalar,
     #[error("invalid dlog proof")]
     InvalidDlogProof,
+    #[error("invalid range proof")]
+    InvalidRangeProof,
+    #[error("invalid segments proof")]
+    InvalidSegmentsProof,
+    #[error("invalid key")]
+    InvalidKey,
 }
 
 pub type Result<T> = anyhow::Result<T, Error>;

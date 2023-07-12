@@ -13,6 +13,15 @@ pub struct ByteProof<C: BulletproofCurveArithmetic> {
     pub(crate) blinder: C::Scalar,
 }
 
+impl<C: BulletproofCurveArithmetic> Default for ByteProof<C> {
+    fn default() -> Self {
+        Self {
+            message: C::Scalar::default(),
+            blinder: C::Scalar::default(),
+        }
+    }
+}
+
 impl<C: BulletproofCurveArithmetic> Display for ByteProof<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.write_fmt(f, data_encoding::BASE64)

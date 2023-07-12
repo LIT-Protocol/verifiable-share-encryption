@@ -115,45 +115,6 @@ impl<C: BulletproofCurveArithmetic> DlogProof<C> {
         }
     }
 
-    /// Verify the proof
-    pub fn verify(
-        &self,
-        encryption_key: C::Point,
-        public_key: C::Point,
-        transcript: &mut Transcript,
-    ) -> Result<()> {
-        transcript.append_point::<C>(b"G", &C::Point::generator());
-        transcript.append_point::<C>(b"Y", &encryption_key);
-        transcript.append_point::<C>(b"C1", &self.c1);
-        transcript.append_point::<C>(b"C2", &self.c2);
-        transcript.append_point::<C>(b"Q", &public_key);
-        transcript.append_point::<C>(b"A1", &self.a1);
-        transcript.append_point::<C>(b"A2", &self.a2);
-        transcript.append_point::<C>(b"A3", &self.a3);
-        let challenge = transcript.challenge_scalar::<C>(b"challenge_dlog_proof");
-
-        // (r1 + c.x).G
-        let lhs1 = C::Point::generator() * self.message;
-        // r1.G + c.x.G
-        let rhs1 = self.a1 + public_key * challenge;
-
-        // (r2 + c.r).Y
-        let lhs2 = encryption_key * self.blinding;
-        // r2.Y + c.x.G + c.r.Y - c.x.G
-        let rhs2 = self.a2 + (self.c2 - public_key) * challenge;
-
-        // (r2 + c.r).G
-        let lhs3 = C::Point::generator() * self.blinding;
-        // r2.G + c.r.G
-        let rhs3 = self.a3 + self.c1 * challenge;
-
-        if lhs1 == rhs1 && lhs2 == rhs2 && lhs3 == rhs3 {
-            Ok(())
-        } else {
-            Err(Error::InvalidDlogProof)
-        }
-    }
-
     /// Return the byte representation of the DlogProof
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(7 * C::POINT_BYTES + 2 * C::SCALAR_BYTES);
