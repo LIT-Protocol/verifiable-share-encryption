@@ -30,6 +30,34 @@ impl<C: BulletproofCurveArithmetic> CurveScalar<C> {
     }
 }
 
+pub struct CurvePoint<C: BulletproofCurveArithmetic> {
+    _marker: PhantomData<C>,
+}
+
+impl<C: BulletproofCurveArithmetic> CurvePoint<C> {
+    pub fn serialize<S: Serializer>(scalar: &C::Point, s: S) -> Result<S::Ok, S::Error> {
+        let bytes = C::serialize_point(scalar);
+        if s.is_human_readable() {
+            data_encoding::BASE64.encode(&bytes).serialize(s)
+        } else {
+            s.serialize_bytes(&bytes)
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<C::Point, D::Error> {
+        if d.is_human_readable() {
+            let value = String::deserialize(d)?;
+            let bytes = data_encoding::BASE64
+                .decode(value.as_bytes())
+                .map_err(|_| serde::de::Error::custom("invalid base64"))?;
+            C::deserialize_point(&bytes).map_err(|_| serde::de::Error::custom("invalid point"))
+        } else {
+            let bytes = Vec::<u8>::deserialize(d)?;
+            C::deserialize_point(&bytes).map_err(|_| serde::de::Error::custom("invalid point"))
+        }
+    }
+}
+
 pub struct PointArray<C: BulletproofCurveArithmetic> {
     _marker: PhantomData<C>,
 }

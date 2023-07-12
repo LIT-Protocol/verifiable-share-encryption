@@ -6,6 +6,8 @@ pub enum Error {
     DeserializedInvalidPoint,
     #[error("invalid scalar")]
     DeserializedInvalidScalar,
+    #[error("invalid dlog proof")]
+    InvalidDlogProof,
 }
 
 pub type Result<T> = anyhow::Result<T, Error>;

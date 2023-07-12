@@ -41,7 +41,7 @@ impl<C: BulletproofCurveArithmetic> ByteProof<C> {
         bytes
     }
 
-    /// Return the ciphertext represented by the given bytes
+    /// Return the byte proof represented by the given bytes
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         assert_eq!(bytes.len(), 2 * C::SCALAR_BYTES);
         C::deserialize_scalar(&bytes[..C::SCALAR_BYTES])
