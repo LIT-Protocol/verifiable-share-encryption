@@ -194,3 +194,22 @@ impl<C: BulletproofCurveArithmetic> DlogProof<C> {
         )
     }
 }
+
+#[test]
+fn serialize_works() {
+    use bulletproofs::k256::{Secp256k1, ProjectivePoint, Scalar};
+
+    let dlog_proof = DlogProof::<Secp256k1> {
+        c1: ProjectivePoint::GENERATOR,
+        c2: ProjectivePoint::GENERATOR,
+        a1: ProjectivePoint::GENERATOR,
+        a2: ProjectivePoint::GENERATOR,
+        a3: ProjectivePoint::GENERATOR,
+        message: Scalar::ONE,
+        blinding: Scalar::ONE,
+    };
+
+    let bytes = serde_bare::to_vec(&dlog_proof).unwrap();
+    let dlog_proof2: DlogProof<Secp256k1> = serde_bare::from_slice(&bytes).unwrap();
+    assert_eq!(dlog_proof, dlog_proof2);
+}

@@ -178,7 +178,7 @@ pub trait VerifiableEncryptionDecryptor: BulletproofCurveArithmetic {
         key_bytes.par_iter_mut().enumerate().for_each(|(i, b)|{
             let vi = ciphertext.c2[i] - ciphertext.c1[i] * *decryption_key;
 
-            for ki in 0u8..255 {
+            for ki in 0u8..=255 {
                 let si = Self::Scalar::from(ki as u64);
                 if vi == Self::Point::generator() * si {
                     *b = ki;
@@ -257,55 +257,131 @@ impl KeyToPoint for bulletproofs::p256::PublicKey {
 }
 
 #[test]
-fn encrypt_and_proof_k256_works() {
+fn encrypt_and_prove_k256_works() {
     use bulletproofs::k256::{SecretKey, Secp256k1};
 
     let mut rng = rand::thread_rng();
     let signing_key = SecretKey::random(&mut rng);
     let verification_key = signing_key.public_key();
 
-    let decryption_key = SecretKey::random(&mut rng);
-    let encryption_key = decryption_key.public_key();
+    encrypt_and_prove_works::<Secp256k1>(signing_key.key_to_scalar(), verification_key.key_to_point());
+}
 
-    let (ciphertext, proof) = Secp256k1::encrypt_and_prove(encryption_key.key_to_point(), &signing_key.key_to_scalar(), &mut rng);
+#[test]
+fn encrypt_and_prove_p256_works() {
+    use bulletproofs::p256::{SecretKey, NistP256};
 
-    let res = Secp256k1::verify(encryption_key.key_to_point(), verification_key.key_to_point(), &ciphertext, &proof);
+    let mut rng = rand::thread_rng();
+    let signing_key = SecretKey::random(&mut rng);
+    let verification_key = signing_key.public_key();
+
+    encrypt_and_prove_works::<NistP256>(signing_key.key_to_scalar(), verification_key.key_to_point());
+}
+
+#[test]
+fn encrypt_and_prove_curve25519_works() {
+    use bulletproofs::{Curve25519, vsss_rs::curve25519::{WrappedScalar, WrappedRistretto}};
+
+    let mut rng = rand::thread_rng();
+    let signing_key = WrappedScalar::random(&mut rng);
+    let verification_key = WrappedRistretto::generator() * signing_key;
+
+    encrypt_and_prove_works::<Curve25519>(signing_key, verification_key);
+}
+
+#[test]
+fn encrypt_and_prove_bls12381_works() {
+    use bulletproofs::bls12_381_plus::{Bls12381G1, Scalar, G1Projective};
+
+    let mut rng = rand::thread_rng();
+    let signing_key = Scalar::random(&mut rng);
+    let verification_key = G1Projective::generator() * signing_key;
+
+    encrypt_and_prove_works::<Bls12381G1>(signing_key, verification_key);
+}
+
+#[test]
+fn encrypt_and_prove_blst12381_works() {
+    use bulletproofs::blstrs_plus::{Bls12381G1, Scalar, G1Projective};
+
+    let mut rng = rand::thread_rng();
+    let signing_key = Scalar::random(&mut rng);
+    let verification_key = G1Projective::generator() * signing_key;
+
+    encrypt_and_prove_works::<Bls12381G1>(signing_key, verification_key);
+}
+
+#[cfg(test)]
+fn encrypt_and_prove_works<C: VerifiableEncryption + VerifiableEncryptionDecryptor>(
+    signing_key: C::Scalar,
+    verification_key: C::Point,
+) {
+    let mut rng = rand::thread_rng();
+    let decryption_key = C::Scalar::random(&mut rng);
+    let encryption_key = C::Point::generator() * decryption_key;
+
+    let (ciphertext, proof) = C::encrypt_and_prove(encryption_key, &signing_key, &mut rng);
+
+    let res = C::verify(encryption_key, verification_key, &ciphertext, &proof);
     assert!(res.is_ok());
 
-    let res = Secp256k1::decrypt(&decryption_key.key_to_scalar(), ciphertext);
+    let res = C::decrypt(&decryption_key, ciphertext);
     assert!(res.is_ok());
-    assert_eq!(res.unwrap(), signing_key.key_to_scalar());
+    assert_eq!(res.unwrap(), signing_key);
 }
 
 #[test]
 fn k256_proof_serde_works() {
-    use bulletproofs::k256::{SecretKey, Secp256k1};
+    ciphertext_proof_serde_works::<bulletproofs::k256::Secp256k1>();
+}
 
+#[test]
+fn p256_proof_serde_works() {
+    ciphertext_proof_serde_works::<bulletproofs::p256::NistP256>();
+}
+
+#[test]
+fn curve25519_proof_serde_works() {
+    ciphertext_proof_serde_works::<bulletproofs::Curve25519>();
+}
+
+#[test]
+fn bls12381_proof_serde_works() {
+    ciphertext_proof_serde_works::<bulletproofs::bls12_381_plus::Bls12381G1>();
+}
+
+#[test]
+fn blst12381_proof_serde_works() {
+    ciphertext_proof_serde_works::<bulletproofs::blstrs_plus::Bls12381G1>();
+}
+
+#[cfg(test)]
+fn ciphertext_proof_serde_works<C: VerifiableEncryption + VerifiableEncryptionDecryptor + Eq + PartialEq>() {
     let mut rng = rand::thread_rng();
-    let signing_key = SecretKey::random(&mut rng);
+    let signing_key = C::Scalar::random(&mut rng);
 
-    let decryption_key = SecretKey::random(&mut rng);
-    let encryption_key = decryption_key.public_key();
+    let decryption_key = C::Scalar::random(&mut rng);
+    let encryption_key = C::Point::generator() * decryption_key;
 
-    let (ciphertext, proof) = Secp256k1::encrypt_and_prove(encryption_key.key_to_point(), &signing_key.key_to_scalar(), &mut rng);
+    let (ciphertext, proof) = C::encrypt_and_prove(encryption_key, &signing_key, &mut rng);
 
     let bytes = serde_bare::to_vec(&ciphertext).unwrap();
-    let ciphertext2: Ciphertext<Secp256k1> = serde_bare::from_slice(&bytes).unwrap();
+    let ciphertext2: Ciphertext<C> = serde_bare::from_slice(&bytes).unwrap();
     assert_eq!(ciphertext.c1, ciphertext2.c1);
     assert_eq!(ciphertext.c2, ciphertext2.c2);
 
     let json = serde_json::to_string(&ciphertext).unwrap();
-    let ciphertext2: Ciphertext<Secp256k1> = serde_json::from_str(&json).unwrap();
+    let ciphertext2: Ciphertext<C> = serde_json::from_str(&json).unwrap();
     assert_eq!(ciphertext.c1, ciphertext2.c1);
     assert_eq!(ciphertext.c2, ciphertext2.c2);
 
     let bytes = serde_bare::to_vec(&proof).unwrap();
-    let proof2: Proof<Secp256k1> = serde_bare::from_slice(&bytes).unwrap();
+    let proof2: Proof<C> = serde_bare::from_slice(&bytes).unwrap();
     assert_eq!(proof.dlog_proof, proof2.dlog_proof);
     assert_eq!(proof.challenge, proof2.challenge);
 
     let json = serde_json::to_string(&proof).unwrap();
-    let proof2: Proof<Secp256k1> = serde_json::from_str(&json).unwrap();
+    let proof2: Proof<C> = serde_json::from_str(&json).unwrap();
     assert_eq!(proof.dlog_proof, proof2.dlog_proof);
     assert_eq!(proof.challenge, proof2.challenge);
 }

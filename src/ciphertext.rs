@@ -14,6 +14,15 @@ pub struct Ciphertext<C: BulletproofCurveArithmetic> {
     pub(crate) c2: [C::Point; 32],
 }
 
+impl<C: BulletproofCurveArithmetic> Default for Ciphertext<C> {
+    fn default() -> Self {
+        Self {
+            c1: [C::Point::identity(); 32],
+            c2: [C::Point::identity(); 32],
+        }
+    }
+}
+
 impl<C: BulletproofCurveArithmetic> Display for Ciphertext<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.write_fmt(f, data_encoding::BASE64)
@@ -89,4 +98,18 @@ impl<C: BulletproofCurveArithmetic> Ciphertext<C> {
         }
         write!(f, "] }}")
     }
+}
+
+#[test]
+fn serialize_test() {
+    use bulletproofs::p256::{ProjectivePoint, NistP256};
+    let ciphertext = Ciphertext::<NistP256> {
+        c1: [ProjectivePoint::GENERATOR; 32],
+        c2: [ProjectivePoint::GENERATOR; 32],
+    };
+
+    let bytes = serde_bare::to_vec(&ciphertext).unwrap();
+    assert_eq!(bytes.len(), 64 * NistP256::POINT_BYTES);
+    let ciphertext2 = serde_bare::from_slice(&bytes).unwrap();
+    assert_eq!(ciphertext, ciphertext2);
 }

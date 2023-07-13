@@ -76,3 +76,19 @@ impl<C: BulletproofCurveArithmetic> ByteProof<C> {
         )
     }
 }
+
+#[test]
+fn serialize_test() {
+    let proof = ByteProof::<bulletproofs::k256::Secp256k1> {
+        message: bulletproofs::k256::Scalar::from(123u64),
+        blinder: bulletproofs::k256::Scalar::from(456u64),
+    };
+    let bytes = serde_bare::to_vec(&proof).unwrap();
+    assert_eq!(bytes.len(), 64);
+    let proof2: ByteProof<bulletproofs::k256::Secp256k1> = serde_bare::from_slice(&bytes).unwrap();
+    assert_eq!(proof, proof2);
+
+    let json = serde_json::to_string(&proof).unwrap();
+    let proof3: ByteProof<bulletproofs::k256::Secp256k1> = serde_json::from_str(&json).unwrap();
+    assert_eq!(proof, proof3);
+}
