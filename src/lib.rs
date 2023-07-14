@@ -1,24 +1,34 @@
 mod byte_proof;
 mod ciphertext;
+mod decryption_share;
 mod dlog_proof;
 mod errors;
 mod proof;
 mod serdes;
 
-use std::ops::Deref;
 pub use byte_proof::*;
 pub use ciphertext::*;
+pub use decryption_share::*;
 pub use dlog_proof::*;
 pub use errors::*;
 pub use proof::*;
 
-use bulletproofs::{group::{
-    ff::{Field, PrimeField},
-    Group,
-}, merlin::Transcript, BulletproofCurveArithmetic, BulletproofGens, PedersenGens, RangeProof, TranscriptProtocol};
-use rand_core::{RngCore, CryptoRng};
+use bulletproofs::vsss_rs::Share;
+use bulletproofs::{
+    group::{
+        ff::{Field, PrimeField},
+        Group,
+    },
+    merlin::Transcript,
+    BulletproofCurveArithmetic, BulletproofGens, PedersenGens, RangeProof, TranscriptProtocol,
+};
+use rand_core::{CryptoRng, RngCore};
+use std::ops::Deref;
 
+/// A trait for types that can use ElGamal encryption scheme for a scalar
 pub trait VerifiableEncryption: BulletproofCurveArithmetic {
+    /// Encrypt the scalar with the given encryption key
+    /// and generate a zero-knowledge proof of the encryption
     fn encrypt_and_prove(
         encryption_key: Self::Point,
         key_share: &Self::Scalar,
@@ -75,7 +85,7 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
         }
 
         let dlog_committing =
-            DlogProof::<Self>::new(encryption_key, *key_share, &mut transcript, &mut rng);
+            DlogProof::<Self>::create(encryption_key, *key_share, &mut transcript, &mut rng);
         let challenge = transcript.challenge_scalar::<Self>(b"elgamal_segment_proofs_challenge");
         let dlog_proof = dlog_committing.finalize(challenge);
 
@@ -99,6 +109,8 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
         )
     }
 
+    /// Verify the ciphertext encrypts a key share that corresponds
+    /// to the verification key
     fn verify(
         encryption_key: Self::Point,
         verification_key: Self::Point,
@@ -111,21 +123,21 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
             B: Self::Point::generator(),
             B_blinding: encryption_key,
         };
-        proof.range_proof.verify_multiple(
-            &bp_gens,
-            &pc_gens,
-            &mut transcript,
-            &ciphertext.c2,
-            8
-        ).map_err(|_e| Error::InvalidRangeProof)?;
+        proof
+            .range_proof
+            .verify_multiple(&bp_gens, &pc_gens, &mut transcript, &ciphertext.c2, 8)
+            .map_err(|_e| Error::InvalidRangeProof)?;
 
         transcript.append_message(b"elgamal_segment_proofs", &[32]);
         for i in 0..32 {
             transcript.append_u64(b"elgamal_segment_proofs_index", i as u64);
             transcript.append_point::<Self>(b"elgamal_segment_proofs_c1", &ciphertext.c1[i]);
             transcript.append_point::<Self>(b"elgamal_segment_proofs_c2", &ciphertext.c2[i]);
-            let r1 = ciphertext.c1[i] * proof.challenge + Self::Point::generator() * proof.byte_proofs[i].blinder;
-            let r2 = ciphertext.c2[i] * proof.challenge + encryption_key * proof.byte_proofs[i].blinder + Self::Point::generator() * proof.byte_proofs[i].message;
+            let r1 = ciphertext.c1[i] * proof.challenge
+                + Self::Point::generator() * proof.byte_proofs[i].blinder;
+            let r2 = ciphertext.c2[i] * proof.challenge
+                + encryption_key * proof.byte_proofs[i].blinder
+                + Self::Point::generator() * proof.byte_proofs[i].message;
             transcript.append_point::<Self>(b"elgamal_segment_proofs_r1", &r1);
             transcript.append_point::<Self>(b"elgamal_segment_proofs_r2", &r2);
         }
@@ -169,13 +181,18 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
     }
 }
 
+/// A trait for types that can use ElGamal decryption scheme for a scalar
 pub trait VerifiableEncryptionDecryptor: BulletproofCurveArithmetic {
-    fn decrypt(decryption_key: &Self::Scalar, ciphertext: Ciphertext<Self>) -> Result<Self::Scalar> {
+    /// Decrypt the ciphertext using the decryption key
+    fn decrypt(
+        decryption_key: &Self::Scalar,
+        ciphertext: &Ciphertext<Self>,
+    ) -> Result<Self::Scalar> {
         use rayon::prelude::*;
 
         let mut key_bytes = [0u8; 32];
 
-        key_bytes.par_iter_mut().enumerate().for_each(|(i, b)|{
+        key_bytes.par_iter_mut().enumerate().for_each(|(i, b)| {
             let vi = ciphertext.c2[i] - ciphertext.c1[i] * *decryption_key;
 
             for ki in 0u8..=255 {
@@ -186,6 +203,61 @@ pub trait VerifiableEncryptionDecryptor: BulletproofCurveArithmetic {
                 }
             }
         });
+        let mut repr = <Self::Scalar as PrimeField>::Repr::default();
+        repr.as_mut().copy_from_slice(&key_bytes);
+        Option::<Self::Scalar>::from(Self::Scalar::from_repr(repr)).ok_or(Error::InvalidKey)
+    }
+
+    /// Decrypt the ciphertext and verify the decrypted value is correct
+    fn decrypt_and_verify(
+        decryption_key: &Self::Scalar,
+        ciphertext: &Ciphertext<Self>,
+        proof: &Proof<Self>,
+    ) -> Result<Self::Scalar> {
+        let plaintext = Self::decrypt(decryption_key, ciphertext)?;
+        if proof.dlog_proof.c2 - proof.dlog_proof.c1 * decryption_key
+            == Self::Point::generator() * plaintext
+        {
+            Ok(plaintext)
+        } else {
+            Err(Error::InvalidCiphertext)
+        }
+    }
+
+    /// Decrypt the ciphertext given the decryption shares
+    fn decrypt_with_shares<P: Share<Identifier = u8>>(
+        decryption_shares: &[DecryptionShare<P, Self>],
+        ciphertext: &Ciphertext<Self>,
+    ) -> Result<Self::Scalar> {
+        use rayon::prelude::*;
+
+        let mut key_bytes = [0u8; 32];
+        let mut decryption_parts = Vec::with_capacity(32);
+        for i in 0..32 {
+            let parts = decryption_shares
+                .iter()
+                .map(|s| s.inner[i].clone())
+                .collect::<Vec<_>>();
+            let share = bulletproofs::vsss_rs::combine_shares_group::<Self::Point, u8, P>(&parts)
+                .map_err(|_| Error::InvalidDecryptionShare)?;
+            decryption_parts.push(share);
+        }
+
+        key_bytes
+            .par_iter_mut()
+            .enumerate()
+            .zip(decryption_parts.par_iter())
+            .for_each(|((i, b), c1)| {
+                let vi = ciphertext.c2[i] - c1;
+
+                for ki in 0u8..=255 {
+                    let si = Self::Scalar::from(ki as u64);
+                    if vi == Self::Point::generator() * si {
+                        *b = ki;
+                        break;
+                    }
+                }
+            });
         let mut repr = <Self::Scalar as PrimeField>::Repr::default();
         repr.as_mut().copy_from_slice(&key_bytes);
         Option::<Self::Scalar>::from(Self::Scalar::from_repr(repr)).ok_or(Error::InvalidKey)
@@ -258,29 +330,38 @@ impl KeyToPoint for bulletproofs::p256::PublicKey {
 
 #[test]
 fn encrypt_and_prove_k256_works() {
-    use bulletproofs::k256::{SecretKey, Secp256k1};
+    use bulletproofs::k256::{Secp256k1, SecretKey};
 
     let mut rng = rand::thread_rng();
     let signing_key = SecretKey::random(&mut rng);
     let verification_key = signing_key.public_key();
 
-    encrypt_and_prove_works::<Secp256k1>(signing_key.key_to_scalar(), verification_key.key_to_point());
+    encrypt_and_prove_works::<Secp256k1>(
+        signing_key.key_to_scalar(),
+        verification_key.key_to_point(),
+    );
 }
 
 #[test]
 fn encrypt_and_prove_p256_works() {
-    use bulletproofs::p256::{SecretKey, NistP256};
+    use bulletproofs::p256::{NistP256, SecretKey};
 
     let mut rng = rand::thread_rng();
     let signing_key = SecretKey::random(&mut rng);
     let verification_key = signing_key.public_key();
 
-    encrypt_and_prove_works::<NistP256>(signing_key.key_to_scalar(), verification_key.key_to_point());
+    encrypt_and_prove_works::<NistP256>(
+        signing_key.key_to_scalar(),
+        verification_key.key_to_point(),
+    );
 }
 
 #[test]
 fn encrypt_and_prove_curve25519_works() {
-    use bulletproofs::{Curve25519, vsss_rs::curve25519::{WrappedScalar, WrappedRistretto}};
+    use bulletproofs::{
+        vsss_rs::curve25519::{WrappedRistretto, WrappedScalar},
+        Curve25519,
+    };
 
     let mut rng = rand::thread_rng();
     let signing_key = WrappedScalar::random(&mut rng);
@@ -291,7 +372,7 @@ fn encrypt_and_prove_curve25519_works() {
 
 #[test]
 fn encrypt_and_prove_bls12381_works() {
-    use bulletproofs::bls12_381_plus::{Bls12381G1, Scalar, G1Projective};
+    use bulletproofs::bls12_381_plus::{Bls12381G1, G1Projective, Scalar};
 
     let mut rng = rand::thread_rng();
     let signing_key = Scalar::random(&mut rng);
@@ -302,7 +383,7 @@ fn encrypt_and_prove_bls12381_works() {
 
 #[test]
 fn encrypt_and_prove_blst12381_works() {
-    use bulletproofs::blstrs_plus::{Bls12381G1, Scalar, G1Projective};
+    use bulletproofs::blstrs_plus::{Bls12381G1, G1Projective, Scalar};
 
     let mut rng = rand::thread_rng();
     let signing_key = Scalar::random(&mut rng);
@@ -325,7 +406,11 @@ fn encrypt_and_prove_works<C: VerifiableEncryption + VerifiableEncryptionDecrypt
     let res = C::verify(encryption_key, verification_key, &ciphertext, &proof);
     assert!(res.is_ok());
 
-    let res = C::decrypt(&decryption_key, ciphertext);
+    let res = C::decrypt(&decryption_key, &ciphertext);
+    assert!(res.is_ok());
+    assert_eq!(res.unwrap(), signing_key);
+
+    let res = C::decrypt_and_verify(&decryption_key, &ciphertext, &proof);
     assert!(res.is_ok());
     assert_eq!(res.unwrap(), signing_key);
 }
@@ -356,7 +441,9 @@ fn blst12381_proof_serde_works() {
 }
 
 #[cfg(test)]
-fn ciphertext_proof_serde_works<C: VerifiableEncryption + VerifiableEncryptionDecryptor + Eq + PartialEq>() {
+fn ciphertext_proof_serde_works<
+    C: VerifiableEncryption + VerifiableEncryptionDecryptor + Eq + PartialEq,
+>() {
     let mut rng = rand::thread_rng();
     let signing_key = C::Scalar::random(&mut rng);
 

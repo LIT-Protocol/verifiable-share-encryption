@@ -74,7 +74,7 @@ impl<C: BulletproofCurveArithmetic> UpperHex for DlogProof<C> {
 }
 
 impl<C: BulletproofCurveArithmetic> DlogProof<C> {
-    pub(crate) fn new(
+    pub(crate) fn create(
         encryption_key: C::Point,
         key_share: C::Scalar,
         transcript: &mut Transcript,
@@ -197,7 +197,7 @@ impl<C: BulletproofCurveArithmetic> DlogProof<C> {
 
 #[test]
 fn serialize_works() {
-    use bulletproofs::k256::{Secp256k1, ProjectivePoint, Scalar};
+    use bulletproofs::k256::{ProjectivePoint, Scalar, Secp256k1};
 
     let dlog_proof = DlogProof::<Secp256k1> {
         c1: ProjectivePoint::GENERATOR,

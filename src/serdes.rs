@@ -1,9 +1,9 @@
 use bulletproofs::{group::Group, BulletproofCurveArithmetic};
 use core::marker::PhantomData;
-use std::fmt::{self, Formatter};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::{SeqAccess, Visitor};
 use serde::ser::SerializeTuple;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt::{self, Formatter};
 
 pub struct CurveScalar<C: BulletproofCurveArithmetic> {
     _marker: PhantomData<C>,
@@ -39,12 +39,19 @@ impl<C: BulletproofCurveArithmetic> CurveScalar<C> {
                     write!(f, "a sequence of bytes")
                 }
 
-                fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error> where A: SeqAccess<'de> {
+                fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+                where
+                    A: SeqAccess<'de>,
+                {
                     let mut bytes = Vec::<u8>::with_capacity(C::SCALAR_BYTES);
                     for _ in 0..C::SCALAR_BYTES {
-                        bytes.push(seq.next_element()?.ok_or_else(|| serde::de::Error::custom("invalid scalar"))?);
+                        bytes.push(
+                            seq.next_element()?
+                                .ok_or_else(|| serde::de::Error::custom("invalid scalar"))?,
+                        );
                     }
-                    C::deserialize_scalar(&bytes).map_err(|_| serde::de::Error::custom("invalid scalar"))
+                    C::deserialize_scalar(&bytes)
+                        .map_err(|_| serde::de::Error::custom("invalid scalar"))
                 }
             }
             d.deserialize_tuple(C::SCALAR_BYTES, ScalarVisitor(PhantomData::<C>))
@@ -86,12 +93,19 @@ impl<C: BulletproofCurveArithmetic> CurvePoint<C> {
                     write!(f, "a sequence of bytes")
                 }
 
-                fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error> where A: SeqAccess<'de> {
+                fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+                where
+                    A: SeqAccess<'de>,
+                {
                     let mut bytes = Vec::<u8>::with_capacity(C::POINT_BYTES);
                     for _ in 0..C::POINT_BYTES {
-                        bytes.push(seq.next_element()?.ok_or_else(|| serde::de::Error::custom("invalid point"))?);
+                        bytes.push(
+                            seq.next_element()?
+                                .ok_or_else(|| serde::de::Error::custom("invalid point"))?,
+                        );
                     }
-                    C::deserialize_point(&bytes).map_err(|_| serde::de::Error::custom("invalid point"))
+                    C::deserialize_point(&bytes)
+                        .map_err(|_| serde::de::Error::custom("invalid point"))
                 }
             }
             d.deserialize_tuple(C::POINT_BYTES, PointVisitor(PhantomData::<C>))
@@ -153,14 +167,20 @@ impl<C: BulletproofCurveArithmetic> PointArray<C> {
                     write!(f, "a sequence of bytes for 32 points")
                 }
 
-                fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error> where A: SeqAccess<'de> {
+                fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+                where
+                    A: SeqAccess<'de>,
+                {
                     let mut points = [C::Point::identity(); 32];
                     let mut bytes = vec![0u8; C::POINT_BYTES];
                     for pt in points.iter_mut() {
                         for b in bytes.iter_mut() {
-                            *b = seq.next_element()?.ok_or_else(|| serde::de::Error::custom("invalid point"))?;
+                            *b = seq
+                                .next_element()?
+                                .ok_or_else(|| serde::de::Error::custom("invalid point"))?;
                         }
-                        *pt = C::deserialize_point(&bytes).map_err(|_| serde::de::Error::custom("invalid point"))?;
+                        *pt = C::deserialize_point(&bytes)
+                            .map_err(|_| serde::de::Error::custom("invalid point"))?;
                     }
                     Ok(points)
                 }

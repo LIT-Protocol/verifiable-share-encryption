@@ -14,6 +14,10 @@ pub enum Error {
     InvalidSegmentsProof,
     #[error("invalid key")]
     InvalidKey,
+    #[error("invalid ciphertext")]
+    InvalidCiphertext,
+    #[error("invalid decryption share")]
+    InvalidDecryptionShare,
 }
 
 pub type Result<T> = anyhow::Result<T, Error>;

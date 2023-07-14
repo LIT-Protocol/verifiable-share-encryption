@@ -32,7 +32,7 @@ $$C_2 = a.Q + r.K$$
 
 $$B = \{C_1, C_2\}$$
 
-Thus the ciphertext is around 2Kb and an accompanying proof is around 3.1Kb.
+Thus, the ciphertext is around 2Kb and an accompanying proof is around 3.1Kb.
 
 ## Implementation
 

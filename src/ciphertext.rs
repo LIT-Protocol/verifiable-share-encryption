@@ -102,7 +102,7 @@ impl<C: BulletproofCurveArithmetic> Ciphertext<C> {
 
 #[test]
 fn serialize_test() {
-    use bulletproofs::p256::{ProjectivePoint, NistP256};
+    use bulletproofs::p256::{NistP256, ProjectivePoint};
     let ciphertext = Ciphertext::<NistP256> {
         c1: [ProjectivePoint::GENERATOR; 32],
         c2: [ProjectivePoint::GENERATOR; 32],

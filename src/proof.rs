@@ -1,7 +1,7 @@
 use bulletproofs::{BulletproofCurveArithmetic, RangeProof};
 use serde::{Deserialize, Serialize};
 
-use crate::{ByteProof, DlogProof, serdes::CurveScalar};
+use crate::{serdes::CurveScalar, ByteProof, DlogProof};
 
 /// The verifiable encryption proof
 #[derive(Clone, Debug, Serialize, Deserialize)]
