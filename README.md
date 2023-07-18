@@ -40,3 +40,5 @@ This crate uses El-Gamal encryption with DLOG proofs but encrypt each byte such 
 Without this step it will be impossible to restore the key. 
 However, this necessitates using bulletproofs to prove each byte is less than $2^8$. 
 Luckily, bulletproofs allows proof aggregation to shrink the proof.
+
+More in-depth details can be found in the [math](docs/math.md)
