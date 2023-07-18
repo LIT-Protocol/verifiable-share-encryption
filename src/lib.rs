@@ -79,7 +79,7 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
             transcript.append_point::<Self>(b"elgamal_segment_proofs_c1", &c1s[i]);
             transcript.append_point::<Self>(b"elgamal_segment_proofs_c2", &c2s[i]);
             let r1 = Self::Point::generator() * blinder_blinders[i];
-            let r2 = Self::Point::generator() * blinders[i] + encryption_key * blinder_blinders[i];
+            let r2 = c1s[i] + encryption_key * blinder_blinders[i];
             transcript.append_point::<Self>(b"elgamal_segment_proofs_r1", &r1);
             transcript.append_point::<Self>(b"elgamal_segment_proofs_r2", &r2);
         }
