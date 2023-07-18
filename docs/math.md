@@ -21,14 +21,16 @@
 
 # Encryption
 
-Nodes have shares $x_i$ of the secret key $x$ with a shared public key $Q = x.P$.
+Nodes have shares $x_i$ of the secret key $x$ with a shared public key $Q = x.P$. $Q_i$ shares were created during
+the DKG protocol and can be used to verify the encryption of the shares.
 Nodes encrypt shares using the public encryption key $Y$.
 A threshold of $t$ nodes is required to decrypt the secret.
 
 This algorithm makes use of the method **CreateBulletproofAggregateRangeProof** which computes an aggregate range proof for a set of bytes checking that each value is less than $2^{32}$ using two provided points $P$ and $Y$.
 
 Input: $Y$, $x_i$
-Output: $\pi$
+
+Output: $\omega$, $\pi$
 
 Steps:
 - Break the key share into bytes $A =$ I2OSP($x_i$)
@@ -70,9 +72,74 @@ Steps:
 - Compute the key share byte proofs
     - $\widehat{a}_i=b_i-c.a_i$
     - $\widehat{b}_i=r_i-c.b_i$
-- Ouput the amalgamated proofs and ciphertext
+- Output the amalgamated proofs and ciphertext
     - Ciphertext - $\omega = \{\{C_1\},\{C_2\}\}$
     - Proof - $\pi=\{c,\{\widehat{a}\},\{\widehat{b}\},\widehat{x_i},\widehat{z},D_1,D_2,A_1,A_2,A_3,\{\pi_{range}\}\}$
 
+# Verification
+
+This algorithm makes use of the method **VerifyBulletproofAggregateRangeProof** which checks an aggregate range proof for a set of bytes checking that each value is less than $2^{32}$ using two provided points $P$ and $Y$.
+If any check returns INVALID, then verify aborts.
+
+Input: $\omega$, $\pi$, $Q_i$, $Y$
+
+Steps:
+- Check each range proof **VerifyBulletproofAggregateRangeProof**($\pi_{range}i$, $P$, $Y$, 32) = VALID
+- Recompute the test values
+  - $T1_i=c.C1_i+b_i.P$
+  - $T2_i=c.C2_i+b_i.Y+a_i.P$
+- Compute the challenge hash that includes in the data $\mathcal{X}$
+  - I2OSP(32)
+  - I2OSP($i$)
+  - $C1_i$
+  - $C2_i$
+  - $T1_i$
+  - $T2_i$
+  - $P$
+  - $Y$
+  - $D_1$
+  - $D_2$
+  - $Q_i$
+  - $A_1$
+  - $A_2$
+  - $A_3$
+  - $c_v=\mathcal{H}_{\mathbb{Z}}(\mathcal{X})$
+- Check $c_v\overset{?}{=}c$
+- Check $\widehat{x_i}.P\overset{?}{=}A_1+c.Q_i$
+- Check $\widehat{z}.Y\overset{?}{=}A_2+c.(D_2-Q_i)$
+- Check $\widehat{z}.P\overset{?}{=}A_3+c.D_1$
+
 # Decryption
 
+Shares can be decrypted using the decryption key $y$ or from key shares $\{y_i\} \in y$.
+
+## With $y$
+Input: $\omega$, $y$
+
+Output: $x_i$
+Steps:
+- Decrypt each byte
+    - $A_i=C2_i - y.C1_i$
+    - Try all valid 8-bit values until $i.P\overset{?}{=}A_i$
+- $x_i=\text{OS2IP}(i)$
+- Check $x_i.P\overset{?}{=}D_2-y.D_1$
+- Output $x_i$
+
+## With shares of $y$
+
+Decryption shares $\alpha_j$ are computed using the share the decryption party knows $y_i$ 
+and the ciphertext $\omega.C1_j$ s.t. $\alpha_j = y_i.C1_j$. 
+The decryption shares are then combined to decrypt the ciphertext.
+This algorithm uses Shamir's Secret Sharing Scheme to combine the decryption shares
+with **Combine**
+
+Input: $\omega$, $\alpha$
+
+Output: $x_i$
+Steps:
+- Decrypt each byte
+  - $\widetilde{C1_i} = \text{Combine}(\alpha_i)$
+  - $A_i=C2_i - \widetilde{C1_i}$
+  - Try all valid 8-bit values until $i.P\overset{?}{=}A_i$
+- $x_i=\text{OS2IP}(i)$
+- Output $x_i$

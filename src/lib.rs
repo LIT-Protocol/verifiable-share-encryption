@@ -395,24 +395,27 @@ fn encrypt_and_prove_blst12381_works() {
 #[cfg(test)]
 fn encrypt_and_prove_works<C: VerifiableEncryption + VerifiableEncryptionDecryptor>(
     signing_key: C::Scalar,
-    verification_key: C::Point,
+    _verification_key: C::Point,
 ) {
     let mut rng = rand::thread_rng();
+    let shares = bulletproofs::vsss_rs::shamir::split_secret::<C::Scalar, u8, Vec<u8>>( 2, 3, signing_key, &mut rng).unwrap();
     let decryption_key = C::Scalar::random(&mut rng);
     let encryption_key = C::Point::generator() * decryption_key;
 
-    let (ciphertext, proof) = C::encrypt_and_prove(encryption_key, &signing_key, &mut rng);
+    let share1 = shares[0].as_field_element::<C::Scalar>().unwrap();
+    let (ciphertext, proof) = C::encrypt_and_prove(encryption_key, &share1, &mut rng);
+    let share_verification_key = C::Point::generator() * share1;
 
-    let res = C::verify(encryption_key, verification_key, &ciphertext, &proof);
+    let res = C::verify(encryption_key, share_verification_key, &ciphertext, &proof);
     assert!(res.is_ok());
 
     let res = C::decrypt(&decryption_key, &ciphertext);
     assert!(res.is_ok());
-    assert_eq!(res.unwrap(), signing_key);
+    assert_eq!(res.unwrap(), share1);
 
     let res = C::decrypt_and_verify(&decryption_key, &ciphertext, &proof);
     assert!(res.is_ok());
-    assert_eq!(res.unwrap(), signing_key);
+    assert_eq!(res.unwrap(), share1);
 }
 
 #[test]
