@@ -27,6 +27,22 @@ use std::ops::Deref;
 
 /// A trait for types that can use ElGamal encryption scheme for a scalar
 pub trait VerifiableEncryption: BulletproofCurveArithmetic {
+    /// Applies blind encryption to the given scalar
+    /// with the specified encryption key
+    /// and generates a zero-knowledge proof of the encryption.
+    ///
+    /// Decryption only returns the blinded value without the blinding factor.
+    fn blind_encrypt_and_prove(
+        encryption_key: Self::Point,
+        key_share: &Self::Scalar,
+        mut rng: impl RngCore + CryptoRng,
+    ) -> (Ciphertext<Self>, Proof<Self>, Self::Scalar) {
+        let blinder = Self::Scalar::random(&mut rng);
+        let blinded_key_share = *key_share + blinder;
+        let (ciphertext, proof) = Self::encrypt_and_prove(encryption_key, &blinded_key_share, rng);
+        (ciphertext, proof, blinder)
+    }
+
     /// Encrypt the scalar with the given encryption key
     /// and generate a zero-knowledge proof of the encryption
     fn encrypt_and_prove(
@@ -262,6 +278,26 @@ pub trait VerifiableEncryptionDecryptor: BulletproofCurveArithmetic {
         repr.as_mut().copy_from_slice(&key_bytes);
         Option::<Self::Scalar>::from(Self::Scalar::from_repr(repr)).ok_or(Error::InvalidKey)
     }
+
+    /// Decrypt the ciphertext using the decryption key and unblind using the blinding factor
+    fn decrypt_and_unblind(
+        blinder: &Self::Scalar,
+        decryption_key: &Self::Scalar,
+        ciphertext: &Ciphertext<Self>,
+    ) -> Result<Self::Scalar> {
+        let blind_plaintext = Self::decrypt(decryption_key, ciphertext)?;
+        Ok(blind_plaintext - blinder)
+    }
+
+    /// Decrypt the ciphertext given the decryption shares and unblind using the blinding factor
+    fn decrypt_with_shares_and_unblind<P: Share<Identifier = u8>>(
+        blinder: &Self::Scalar,
+        decryption_shares: &[DecryptionShare<P, Self>],
+        ciphertext: &Ciphertext<Self>,
+    ) -> Result<Self::Scalar> {
+        let blind_plaintext = Self::decrypt_with_shares(decryption_shares, ciphertext)?;
+        Ok(blind_plaintext - blinder)
+    }
 }
 
 impl VerifiableEncryption for bulletproofs::k256::Secp256k1 {}
@@ -326,6 +362,103 @@ impl KeyToPoint for bulletproofs::p256::PublicKey {
     fn key_to_point(&self) -> bulletproofs::p256::ProjectivePoint {
         self.to_projective()
     }
+}
+
+#[test]
+fn blind_encrypt_and_prove_k256_works() {
+    use bulletproofs::k256::{Secp256k1, SecretKey};
+
+    let mut rng = rand::thread_rng();
+    let signing_key = SecretKey::random(&mut rng);
+    let verification_key = signing_key.public_key();
+
+    blind_encrypt_and_prove_works::<Secp256k1>(
+        signing_key.key_to_scalar(),
+        verification_key.key_to_point(),
+    );
+}
+
+#[test]
+fn blind_encrypt_and_prove_p256_works() {
+    use bulletproofs::p256::{NistP256, SecretKey};
+
+    let mut rng = rand::thread_rng();
+    let signing_key = SecretKey::random(&mut rng);
+    let verification_key = signing_key.public_key();
+
+    blind_encrypt_and_prove_works::<NistP256>(
+        signing_key.key_to_scalar(),
+        verification_key.key_to_point(),
+    );
+}
+
+#[test]
+fn blind_encrypt_and_prove_curve25519_works() {
+    use bulletproofs::{
+        vsss_rs::curve25519::{WrappedRistretto, WrappedScalar},
+        Curve25519,
+    };
+
+    let mut rng = rand::thread_rng();
+    let signing_key = WrappedScalar::random(&mut rng);
+    let verification_key = WrappedRistretto::generator() * signing_key;
+
+    blind_encrypt_and_prove_works::<Curve25519>(signing_key, verification_key);
+}
+
+#[test]
+fn blind_encrypt_and_prove_bls12381_works() {
+    use bulletproofs::bls12_381_plus::{Bls12381G1, G1Projective, Scalar};
+
+    let mut rng = rand::thread_rng();
+    let signing_key = Scalar::random(&mut rng);
+    let verification_key = G1Projective::generator() * signing_key;
+
+    blind_encrypt_and_prove_works::<Bls12381G1>(signing_key, verification_key);
+}
+
+#[test]
+fn blind_encrypt_and_prove_blst12381_works() {
+    use bulletproofs::blstrs_plus::{Bls12381G1, G1Projective, Scalar};
+
+    let mut rng = rand::thread_rng();
+    let signing_key = Scalar::random(&mut rng);
+    let verification_key = G1Projective::generator() * signing_key;
+
+    blind_encrypt_and_prove_works::<Bls12381G1>(signing_key, verification_key);
+}
+
+#[cfg(test)]
+fn blind_encrypt_and_prove_works<C: VerifiableEncryption + VerifiableEncryptionDecryptor>(
+    signing_key: C::Scalar,
+    _verification_key: C::Point,
+) {
+    let mut rng = rand::thread_rng();
+    let shares = bulletproofs::vsss_rs::shamir::split_secret::<C::Scalar, u8, Vec<u8>>( 2, 3, signing_key, &mut rng).unwrap();
+    let decryption_key = C::Scalar::random(&mut rng);
+    let encryption_key = C::Point::generator() * decryption_key;
+
+    let share1 = shares[0].as_field_element::<C::Scalar>().unwrap();
+    let (ciphertext, proof, blinder) = C::blind_encrypt_and_prove(encryption_key, &share1, &mut rng);
+    let share_verification_key = C::Point::generator() * share1;
+
+    let res = C::verify(encryption_key, share_verification_key, &ciphertext, &proof);
+    assert!(res.is_err());
+    let share_verification_key = C::Point::generator() * (share1 + blinder);
+    let res = C::verify(encryption_key, share_verification_key, &ciphertext, &proof);
+    assert!(res.is_ok());
+
+    let res = C::decrypt(&decryption_key, &ciphertext);
+    assert!(res.is_ok());
+    assert_ne!(res.unwrap(), share1);
+
+    let res = C::decrypt_and_verify(&decryption_key, &ciphertext, &proof);
+    assert!(res.is_ok());
+    assert_ne!(res.unwrap(), share1);
+
+    let res = C::decrypt_and_unblind(&blinder, &decryption_key, &ciphertext);
+    assert!(res.is_ok());
+    assert_eq!(res.unwrap(), share1);
 }
 
 #[test]
