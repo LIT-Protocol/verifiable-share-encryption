@@ -35,12 +35,12 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
     fn blind_encrypt_and_prove(
         encryption_key: Self::Point,
         key_share: &Self::Scalar,
-        mut rng: impl RngCore + CryptoRng,
-    ) -> (Ciphertext<Self>, Proof<Self>, Self::Scalar) {
-        let blinder = Self::Scalar::random(&mut rng);
+        blinder: &Self::Scalar,
+        rng: impl RngCore + CryptoRng,
+    ) -> (Ciphertext<Self>, Proof<Self>) {
         let blinded_key_share = *key_share + blinder;
         let (ciphertext, proof) = Self::encrypt_and_prove(encryption_key, &blinded_key_share, rng);
-        (ciphertext, proof, blinder)
+        (ciphertext, proof)
     }
 
     /// Encrypt the scalar with the given encryption key
@@ -437,9 +437,10 @@ fn blind_encrypt_and_prove_works<C: VerifiableEncryption + VerifiableEncryptionD
     let shares = bulletproofs::vsss_rs::shamir::split_secret::<C::Scalar, u8, Vec<u8>>( 2, 3, signing_key, &mut rng).unwrap();
     let decryption_key = C::Scalar::random(&mut rng);
     let encryption_key = C::Point::generator() * decryption_key;
+    let blinder = C::Scalar::random(&mut rng);
 
     let share1 = shares[0].as_field_element::<C::Scalar>().unwrap();
-    let (ciphertext, proof, blinder) = C::blind_encrypt_and_prove(encryption_key, &share1, &mut rng);
+    let (ciphertext, proof) = C::blind_encrypt_and_prove(encryption_key, &share1, &blinder, &mut rng);
     let share_verification_key = C::Point::generator() * share1;
 
     let res = C::verify(encryption_key, share_verification_key, &ciphertext, &proof);
