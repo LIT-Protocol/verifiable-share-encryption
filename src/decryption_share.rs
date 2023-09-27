@@ -298,7 +298,7 @@ fn decryption_share_test<C: VerifiableEncryption + VerifiableEncryptionDecryptor
     let decryption_key = C::Scalar::random(&mut rng);
     let encryption_key = C::Point::generator() * decryption_key;
 
-    let (ciphertext, _) = C::encrypt_and_prove(encryption_key, &signing_key, &mut rng);
+    let (ciphertext, _) = C::encrypt_and_prove(encryption_key, &signing_key, &[], &mut rng);
     let shares: Vec<Vec<u8>> = shamir::split_secret(2, 3, decryption_key, &mut rng).unwrap();
 
     let decryption_share1 = DecryptionShare::<Vec<u8>, C>::new(&shares[0], &ciphertext);
@@ -346,7 +346,7 @@ fn decryption_share_serialize_test<C: VerifiableEncryption + VerifiableEncryptio
     let decryption_key = C::Scalar::random(&mut rng);
     let encryption_key = C::Point::generator() * decryption_key;
 
-    let (ciphertext, _) = C::encrypt_and_prove(encryption_key, &signing_key, &mut rng);
+    let (ciphertext, _) = C::encrypt_and_prove(encryption_key, &signing_key, &[], &mut rng);
     let shares: Vec<Vec<u8>> = shamir::split_secret(2, 3, decryption_key, &mut rng).unwrap();
 
     let decryption_share1 = DecryptionShare::<Vec<u8>, C>::new(&shares[0], &ciphertext);

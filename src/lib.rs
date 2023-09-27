@@ -36,10 +36,12 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
         encryption_key: Self::Point,
         key_share: &Self::Scalar,
         blinder: &Self::Scalar,
+        authenticated_data: &[u8],
         rng: impl RngCore + CryptoRng,
     ) -> (Ciphertext<Self>, Proof<Self>) {
         let blinded_key_share = *key_share + blinder;
-        let (ciphertext, proof) = Self::encrypt_and_prove(encryption_key, &blinded_key_share, rng);
+        let (ciphertext, proof) =
+            Self::encrypt_and_prove(encryption_key, &blinded_key_share, authenticated_data, rng);
         (ciphertext, proof)
     }
 
@@ -48,6 +50,7 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
     fn encrypt_and_prove(
         encryption_key: Self::Point,
         key_share: &Self::Scalar,
+        authenticated_data: &[u8],
         mut rng: impl RngCore + CryptoRng,
     ) -> (Ciphertext<Self>, Proof<Self>) {
         let mut transcript = Transcript::new(b"ElGamalVerifiableEncryption");
@@ -102,6 +105,8 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
 
         let dlog_committing =
             DlogProof::<Self>::create(encryption_key, *key_share, &mut transcript, &mut rng);
+
+        transcript.append_message(b"authenticated_data", authenticated_data);
         let challenge = transcript.challenge_scalar::<Self>(b"elgamal_segment_proofs_challenge");
         let dlog_proof = dlog_committing.finalize(challenge);
 
@@ -132,6 +137,7 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
         verification_key: Self::Point,
         ciphertext: &Ciphertext<Self>,
         proof: &Proof<Self>,
+        authenticated_data: &[u8],
     ) -> Result<()> {
         let mut transcript = Transcript::new(b"ElGamalVerifiableEncryption");
         let bp_gens = BulletproofGens::new(8, 32);
@@ -166,6 +172,7 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
         transcript.append_point::<Self>(b"A1", &proof.dlog_proof.a1);
         transcript.append_point::<Self>(b"A2", &proof.dlog_proof.a2);
         transcript.append_point::<Self>(b"A3", &proof.dlog_proof.a3);
+        transcript.append_message(b"authenticated_data", authenticated_data);
         let challenge = transcript.challenge_scalar::<Self>(b"elgamal_segment_proofs_challenge");
 
         if challenge != proof.challenge {
@@ -434,19 +441,38 @@ fn blind_encrypt_and_prove_works<C: VerifiableEncryption + VerifiableEncryptionD
     _verification_key: C::Point,
 ) {
     let mut rng = rand::thread_rng();
-    let shares = bulletproofs::vsss_rs::shamir::split_secret::<C::Scalar, u8, Vec<u8>>( 2, 3, signing_key, &mut rng).unwrap();
+    let shares = bulletproofs::vsss_rs::shamir::split_secret::<C::Scalar, u8, Vec<u8>>(
+        2,
+        3,
+        signing_key,
+        &mut rng,
+    )
+    .unwrap();
     let decryption_key = C::Scalar::random(&mut rng);
     let encryption_key = C::Point::generator() * decryption_key;
     let blinder = C::Scalar::random(&mut rng);
 
     let share1 = shares[0].as_field_element::<C::Scalar>().unwrap();
-    let (ciphertext, proof) = C::blind_encrypt_and_prove(encryption_key, &share1, &blinder, &mut rng);
+    let (ciphertext, proof) =
+        C::blind_encrypt_and_prove(encryption_key, &share1, &blinder, &[], &mut rng);
     let share_verification_key = C::Point::generator() * share1;
 
-    let res = C::verify(encryption_key, share_verification_key, &ciphertext, &proof);
+    let res = C::verify(
+        encryption_key,
+        share_verification_key,
+        &ciphertext,
+        &proof,
+        &[],
+    );
     assert!(res.is_err());
     let share_verification_key = C::Point::generator() * (share1 + blinder);
-    let res = C::verify(encryption_key, share_verification_key, &ciphertext, &proof);
+    let res = C::verify(
+        encryption_key,
+        share_verification_key,
+        &ciphertext,
+        &proof,
+        &[],
+    );
     assert!(res.is_ok());
 
     let res = C::decrypt(&decryption_key, &ciphertext);
@@ -532,15 +558,27 @@ fn encrypt_and_prove_works<C: VerifiableEncryption + VerifiableEncryptionDecrypt
     _verification_key: C::Point,
 ) {
     let mut rng = rand::thread_rng();
-    let shares = bulletproofs::vsss_rs::shamir::split_secret::<C::Scalar, u8, Vec<u8>>( 2, 3, signing_key, &mut rng).unwrap();
+    let shares = bulletproofs::vsss_rs::shamir::split_secret::<C::Scalar, u8, Vec<u8>>(
+        2,
+        3,
+        signing_key,
+        &mut rng,
+    )
+    .unwrap();
     let decryption_key = C::Scalar::random(&mut rng);
     let encryption_key = C::Point::generator() * decryption_key;
 
     let share1 = shares[0].as_field_element::<C::Scalar>().unwrap();
-    let (ciphertext, proof) = C::encrypt_and_prove(encryption_key, &share1, &mut rng);
+    let (ciphertext, proof) = C::encrypt_and_prove(encryption_key, &share1, &[], &mut rng);
     let share_verification_key = C::Point::generator() * share1;
 
-    let res = C::verify(encryption_key, share_verification_key, &ciphertext, &proof);
+    let res = C::verify(
+        encryption_key,
+        share_verification_key,
+        &ciphertext,
+        &proof,
+        &[],
+    );
     assert!(res.is_ok());
 
     let res = C::decrypt(&decryption_key, &ciphertext);
@@ -587,7 +625,7 @@ fn ciphertext_proof_serde_works<
     let decryption_key = C::Scalar::random(&mut rng);
     let encryption_key = C::Point::generator() * decryption_key;
 
-    let (ciphertext, proof) = C::encrypt_and_prove(encryption_key, &signing_key, &mut rng);
+    let (ciphertext, proof) = C::encrypt_and_prove(encryption_key, &signing_key, &[], &mut rng);
 
     let bytes = serde_bare::to_vec(&ciphertext).unwrap();
     let ciphertext2: Ciphertext<C> = serde_bare::from_slice(&bytes).unwrap();
