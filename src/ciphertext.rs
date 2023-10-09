@@ -1,12 +1,13 @@
 use bulletproofs::{group::Group, BulletproofCurveArithmetic};
 use core::fmt::{self, Display, Formatter, LowerHex, UpperHex};
 use serde::{Deserialize, Serialize};
+use std::hash::{Hash, Hasher};
 
 use crate::{errors::Result, serdes::PointArray, Error};
 
 /// A ciphertext that encodes a secret key share
 /// TODO: Use C::SCALAR_BYTES when #![feature(generic_const_exprs)] is stable
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ciphertext<C: BulletproofCurveArithmetic> {
     #[serde(with = "PointArray::<C>")]
     pub(crate) c1: [C::Point; 32],
@@ -38,6 +39,12 @@ impl<C: BulletproofCurveArithmetic> LowerHex for Ciphertext<C> {
 impl<C: BulletproofCurveArithmetic> UpperHex for Ciphertext<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.write_fmt(f, data_encoding::HEXUPPER)
+    }
+}
+
+impl<C: BulletproofCurveArithmetic> Hash for Ciphertext<C> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.to_bytes().hash(state);
     }
 }
 
@@ -103,6 +110,9 @@ impl<C: BulletproofCurveArithmetic> Ciphertext<C> {
 #[test]
 fn serialize_test() {
     use bulletproofs::p256::{NistP256, ProjectivePoint};
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
     let ciphertext = Ciphertext::<NistP256> {
         c1: [ProjectivePoint::GENERATOR; 32],
         c2: [ProjectivePoint::GENERATOR; 32],
@@ -112,4 +122,10 @@ fn serialize_test() {
     assert_eq!(bytes.len(), 64 * NistP256::POINT_BYTES);
     let ciphertext2 = serde_bare::from_slice(&bytes).unwrap();
     assert_eq!(ciphertext, ciphertext2);
+
+    let mut hasher = DefaultHasher::new();
+    let mut hasher2 = DefaultHasher::new();
+    ciphertext.hash(&mut hasher);
+    ciphertext2.hash(&mut hasher2);
+    assert_eq!(hasher.finish(), hasher2.finish());
 }
