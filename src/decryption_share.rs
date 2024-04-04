@@ -23,10 +23,10 @@ impl<P: Share<Identifier = u8>, C: VerifiableEncryption + VerifiableEncryptionDe
             let mut tupler = s.serialize_tuple(32)?;
             for share in self.inner.iter() {
                 let identifier = share.identifier();
-                let bytes = share.value();
+                let bytes = &share.value_vec()[1..];
                 let mut data = Vec::with_capacity(1 + bytes.len());
                 data.push(identifier);
-                data.extend_from_slice(bytes);
+                data.extend_from_slice(&bytes);
                 tupler.serialize_element(&data_encoding::BASE64.encode(&data))?;
             }
             tupler.end()
@@ -34,7 +34,7 @@ impl<P: Share<Identifier = u8>, C: VerifiableEncryption + VerifiableEncryptionDe
             let mut bytes = Vec::<u8>::with_capacity(32 * 33);
             for share in self.inner.iter() {
                 let identifier = share.identifier();
-                let value = share.value();
+                let value = &share.value_vec()[1..];
                 bytes.push(identifier);
                 bytes.extend_from_slice(value);
             }
@@ -63,14 +63,14 @@ impl<'de, P: Share<Identifier = u8>, C: VerifiableEncryption + VerifiableEncrypt
             assert_eq!(inner_bytes.len(), 32);
             for (share, bytes) in inner.iter_mut().zip(inner_bytes.iter()) {
                 *share.identifier_mut() = bytes[0];
-                share.value_mut().copy_from_slice(&bytes[1..]);
+                let _ = share.value_mut(&bytes[1..]);
             }
         } else {
             let bytes = Vec::<u8>::deserialize(d)?;
             let mut pos = &bytes[..];
             for share in inner.iter_mut() {
                 *share.identifier_mut() = pos[0];
-                share.value_mut().copy_from_slice(&pos[1..share_len + 1]);
+                let _ = share.value_mut(&pos[1..share_len + 1]);
                 pos = &pos[share_len + 1..];
             }
         }
