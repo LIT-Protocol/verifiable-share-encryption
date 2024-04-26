@@ -23,7 +23,7 @@ impl<P: Share<Identifier = u8>, C: VerifiableEncryption + VerifiableEncryptionDe
             let mut tupler = s.serialize_tuple(32)?;
             for share in self.inner.iter() {
                 let identifier = share.identifier();
-                let bytes = &share.value_vec()[1..];
+                let bytes = &share.value_vec();
                 let mut data = Vec::with_capacity(1 + bytes.len());
                 data.push(identifier);
                 data.extend_from_slice(&bytes);
@@ -34,7 +34,7 @@ impl<P: Share<Identifier = u8>, C: VerifiableEncryption + VerifiableEncryptionDe
             let mut bytes = Vec::<u8>::with_capacity(32 * 33);
             for share in self.inner.iter() {
                 let identifier = share.identifier();
-                let value = &share.value_vec()[1..];
+                let value = &share.value_vec();
                 bytes.push(identifier);
                 bytes.extend_from_slice(value);
             }
