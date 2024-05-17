@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use crate::{Ciphertext, VerifiableEncryption, VerifiableEncryptionDecryptor};
 
 /// A decryption key share that allows for decryption of a ciphertext
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct DecryptionShare<P: Share<Identifier = u8>, C: BulletproofCurveArithmetic> {
     pub(crate) inner: [P; 32],
     pub(crate) _marker: PhantomData<C>,
@@ -335,7 +335,9 @@ fn decryption_share_serialize_test_bls12_381_std() {
 }
 
 #[cfg(test)]
-fn decryption_share_serialize_test<C: VerifiableEncryption + VerifiableEncryptionDecryptor>() {
+fn decryption_share_serialize_test<
+    C: VerifiableEncryption + VerifiableEncryptionDecryptor + std::cmp::PartialEq,
+>() {
     use bulletproofs::{
         group::{ff::Field, Group},
         vsss_rs::shamir,
@@ -353,21 +355,9 @@ fn decryption_share_serialize_test<C: VerifiableEncryption + VerifiableEncryptio
 
     let bytes = serde_bare::to_vec(&decryption_share1).unwrap();
     let deserialized_share2: DecryptionShare<Vec<u8>, C> = serde_bare::from_slice(&bytes).unwrap();
-    for (a, b) in decryption_share1
-        .inner
-        .iter()
-        .zip(deserialized_share2.inner.iter())
-    {
-        assert_eq!(a, b);
-    }
+    assert_eq!(decryption_share1, deserialized_share2);
 
     let json = serde_json::to_string(&decryption_share1).unwrap();
     let deserialized_share2: DecryptionShare<Vec<u8>, C> = serde_json::from_str(&json).unwrap();
-    for (a, b) in decryption_share1
-        .inner
-        .iter()
-        .zip(deserialized_share2.inner.iter())
-    {
-        assert_eq!(a, b);
-    }
+    assert_eq!(decryption_share1, deserialized_share2);
 }
