@@ -1,5 +1,6 @@
 use bulletproofs::group::GroupEncoding;
-use bulletproofs::{vsss_rs::Share, BulletproofCurveArithmetic};
+use bulletproofs::BulletproofCurveArithmetic;
+use legacy_vsss_rs::Share;
 use serde::{ser::SerializeTuple, Deserialize, Deserializer, Serialize, Serializer};
 use std::marker::PhantomData;
 
@@ -290,7 +291,6 @@ fn decryption_share_test_bls12_381_std() {
 fn decryption_share_test<C: VerifiableEncryption + VerifiableEncryptionDecryptor>() {
     use bulletproofs::{
         group::{ff::Field, Group},
-        vsss_rs::shamir,
     };
 
     let mut rng = rand::thread_rng();
@@ -299,7 +299,7 @@ fn decryption_share_test<C: VerifiableEncryption + VerifiableEncryptionDecryptor
     let encryption_key = C::Point::generator() * decryption_key;
 
     let (ciphertext, _) = C::encrypt_and_prove(encryption_key, &signing_key, &[], &mut rng);
-    let shares: Vec<Vec<u8>> = shamir::split_secret(2, 3, decryption_key, &mut rng).unwrap();
+    let shares: Vec<Vec<u8>> = legacy_vsss_rs::shamir::split_secret(2, 3, decryption_key, &mut rng).unwrap();
 
     let decryption_share1 = DecryptionShare::<Vec<u8>, C>::new(&shares[0], &ciphertext);
     let decryption_share2 = DecryptionShare::<Vec<u8>, C>::new(&shares[1], &ciphertext);
@@ -336,11 +336,10 @@ fn decryption_share_serialize_test_bls12_381_std() {
 
 #[cfg(test)]
 fn decryption_share_serialize_test<
-    C: VerifiableEncryption + VerifiableEncryptionDecryptor + std::cmp::PartialEq,
+    C: VerifiableEncryption + VerifiableEncryptionDecryptor + PartialEq,
 >() {
     use bulletproofs::{
         group::{ff::Field, Group},
-        vsss_rs::shamir,
     };
 
     let mut rng = rand::thread_rng();
@@ -349,7 +348,7 @@ fn decryption_share_serialize_test<
     let encryption_key = C::Point::generator() * decryption_key;
 
     let (ciphertext, _) = C::encrypt_and_prove(encryption_key, &signing_key, &[], &mut rng);
-    let shares: Vec<Vec<u8>> = shamir::split_secret(2, 3, decryption_key, &mut rng).unwrap();
+    let shares: Vec<Vec<u8>> = legacy_vsss_rs::shamir::split_secret(2, 3, decryption_key, &mut rng).unwrap();
 
     let decryption_share1 = DecryptionShare::<Vec<u8>, C>::new(&shares[0], &ciphertext);
 

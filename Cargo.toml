@@ -1,6 +1,6 @@
 [package]
 name = "verifiable-share-encryption"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2021"
 
 [features]
@@ -17,22 +17,23 @@ features = [
     "k256",
     "p256",
     "bls12_381",
-    "bls12_381_std"
+    "bls12_381_std",
+    "ed448"
 ]
 git = "https://github.com/LIT-Protocol/bulletproofs.git"
 
 [dependencies.data-encoding]
-version = "2.3"
+version = "2.6"
 
 [dependencies.ed25519-dalek]
-version = "2.0.0"
+version = "2.1.1"
 
 [dependencies.rand_core]
 version = "0.6"
 features = ["std"]
 
 [dependencies.rayon]
-version = "1.5"
+version = "1.10"
 
 [dependencies.serde]
 version = "1.0"
@@ -40,6 +41,10 @@ features = ["derive"]
 
 [dependencies.thiserror]
 version = "1.0"
+
+[dependencies]
+legacy-vsss-rs = { version = "4.3.8", features = ["std"],  package = "vsss-rs"}
+elliptic-curve-tools = "0.1.1"
 
 [dev-dependencies]
 rand = "0.8"

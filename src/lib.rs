@@ -13,7 +13,7 @@ pub use dlog_proof::*;
 pub use errors::*;
 pub use proof::*;
 
-use bulletproofs::vsss_rs::Share;
+use legacy_vsss_rs::Share;
 use bulletproofs::{
     group::{
         ff::{Field, PrimeField},
@@ -213,9 +213,9 @@ pub trait VerifiableEncryptionDecryptor: BulletproofCurveArithmetic {
     ) -> Result<Self::Scalar> {
         use rayon::prelude::*;
 
-        let mut key_bytes = [0u8; 32];
+        let mut repr = <Self::Scalar as PrimeField>::Repr::default();
 
-        key_bytes.par_iter_mut().enumerate().for_each(|(i, b)| {
+        repr.as_mut().par_iter_mut().enumerate().for_each(|(i, b)| {
             let vi = ciphertext.c2[i] - ciphertext.c1[i] * *decryption_key;
 
             for ki in 0u8..=255 {
@@ -226,8 +226,6 @@ pub trait VerifiableEncryptionDecryptor: BulletproofCurveArithmetic {
                 }
             }
         });
-        let mut repr = <Self::Scalar as PrimeField>::Repr::default();
-        repr.as_mut().copy_from_slice(&key_bytes);
         Option::<Self::Scalar>::from(Self::Scalar::from_repr(repr)).ok_or(Error::InvalidKey)
     }
 
@@ -254,19 +252,19 @@ pub trait VerifiableEncryptionDecryptor: BulletproofCurveArithmetic {
     ) -> Result<Self::Scalar> {
         use rayon::prelude::*;
 
-        let mut key_bytes = [0u8; 32];
+        let mut repr = <Self::Scalar as PrimeField>::Repr::default();
         let mut decryption_parts = Vec::with_capacity(32);
         for i in 0..32 {
             let parts = decryption_shares
                 .iter()
                 .map(|s| s.inner[i].clone())
                 .collect::<Vec<_>>();
-            let share = bulletproofs::vsss_rs::combine_shares_group::<Self::Point, u8, P>(&parts)
+            let share = legacy_vsss_rs::combine_shares_group::<Self::Point, u8, P>(&parts)
                 .map_err(|_| Error::InvalidDecryptionShare)?;
             decryption_parts.push(share);
         }
 
-        key_bytes
+        repr.as_mut()
             .par_iter_mut()
             .enumerate()
             .zip(decryption_parts.par_iter())
@@ -281,8 +279,6 @@ pub trait VerifiableEncryptionDecryptor: BulletproofCurveArithmetic {
                     }
                 }
             });
-        let mut repr = <Self::Scalar as PrimeField>::Repr::default();
-        repr.as_mut().copy_from_slice(&key_bytes);
         Option::<Self::Scalar>::from(Self::Scalar::from_repr(repr)).ok_or(Error::InvalidKey)
     }
 
@@ -441,7 +437,7 @@ fn blind_encrypt_and_prove_works<C: VerifiableEncryption + VerifiableEncryptionD
     _verification_key: C::Point,
 ) {
     let mut rng = rand::thread_rng();
-    let shares = bulletproofs::vsss_rs::shamir::split_secret::<C::Scalar, u8, Vec<u8>>(
+    let shares = legacy_vsss_rs::shamir::split_secret::<C::Scalar, u8, Vec<u8>>(
         2,
         3,
         signing_key,
@@ -558,7 +554,7 @@ fn encrypt_and_prove_works<C: VerifiableEncryption + VerifiableEncryptionDecrypt
     _verification_key: C::Point,
 ) {
     let mut rng = rand::thread_rng();
-    let shares = bulletproofs::vsss_rs::shamir::split_secret::<C::Scalar, u8, Vec<u8>>(
+    let shares = legacy_vsss_rs::shamir::split_secret::<C::Scalar, u8, Vec<u8>>(
         2,
         3,
         signing_key,
