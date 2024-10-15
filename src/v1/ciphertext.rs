@@ -1,39 +1,39 @@
 use bulletproofs::{group::Group, BulletproofCurveArithmetic};
 use core::fmt::{self, Display, Formatter, LowerHex, UpperHex};
-use elliptic_curve_tools::group_vec;
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 
+use super::serdes::PointArray;
 use crate::{Error, Result};
 
 /// A ciphertext that encodes a secret key share
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+/// TODO: Use C::SCALAR_BYTES when #![feature(generic_const_exprs)] is stable
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ciphertext<C: BulletproofCurveArithmetic> {
-    #[serde(with = "group_vec")]
-    pub(crate) c1: Vec<C::Point>,
-    #[serde(with = "group_vec")]
-    pub(crate) c2: Vec<C::Point>,
+    #[serde(with = "PointArray::<C>")]
+    pub(crate) c1: [C::Point; 32],
+    #[serde(with = "PointArray::<C>")]
+    pub(crate) c2: [C::Point; 32],
 }
 
-#[cfg(feature = "v1")]
-impl<C: BulletproofCurveArithmetic> From<crate::v1::Ciphertext<C>> for Ciphertext<C> {
-    fn from(value: crate::v1::Ciphertext<C>) -> Self {
+impl<C: BulletproofCurveArithmetic> Default for Ciphertext<C> {
+    fn default() -> Self {
         Self {
-            c1: value.c1.to_vec(),
-            c2: value.c2.to_vec(),
+            c1: [C::Point::identity(); 32],
+            c2: [C::Point::identity(); 32],
         }
     }
 }
 
 impl<C: BulletproofCurveArithmetic> Display for Ciphertext<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.write_fmt(f, data_encoding::HEXLOWER)
+        self.write_fmt(f, data_encoding::BASE64)
     }
 }
 
 impl<C: BulletproofCurveArithmetic> LowerHex for Ciphertext<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        self.write_fmt(f, data_encoding::HEXLOWER)
     }
 }
 
@@ -52,29 +52,29 @@ impl<C: BulletproofCurveArithmetic> Hash for Ciphertext<C> {
 impl<C: BulletproofCurveArithmetic> Ciphertext<C> {
     /// Return the byte representation of the ciphertext
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(2 * C::SCALAR_BYTES * C::POINT_BYTES);
+        let mut bytes = Vec::with_capacity(64 * C::POINT_BYTES);
         for point in self.c1.iter() {
             bytes.append(&mut C::serialize_point(point));
         }
         for point in self.c2.iter() {
             bytes.append(&mut C::serialize_point(point));
         }
-        debug_assert_eq!(bytes.len(), 2 * C::SCALAR_BYTES * C::POINT_BYTES);
+        debug_assert_eq!(bytes.len(), 64 * C::POINT_BYTES);
         bytes
     }
 
     /// Return the ciphertext represented by the given bytes
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        assert_eq!(bytes.len(), 2 * C::SCALAR_BYTES * C::POINT_BYTES);
+        assert_eq!(bytes.len(), 64 * C::POINT_BYTES);
 
         let mut pos = bytes;
-        let mut c1 = vec![C::Point::identity(); C::SCALAR_BYTES];
+        let mut c1 = [C::Point::identity(); 32];
         for pt in c1.iter_mut() {
             *pt = C::deserialize_point(&pos[..C::POINT_BYTES])
                 .map_err(|_| Error::DeserializedInvalidPoint)?;
             pos = &pos[C::POINT_BYTES..];
         }
-        let mut c2 = vec![C::Point::identity(); C::SCALAR_BYTES];
+        let mut c2 = [C::Point::identity(); 32];
         for pt in c2.iter_mut() {
             *pt = C::deserialize_point(&pos[..C::POINT_BYTES])
                 .map_err(|_| Error::DeserializedInvalidPoint)?;
@@ -115,11 +115,12 @@ fn serialize_test() {
     use std::hash::{Hash, Hasher};
 
     let ciphertext = Ciphertext::<NistP256> {
-        c1: vec![ProjectivePoint::GENERATOR; 32],
-        c2: vec![ProjectivePoint::GENERATOR; 32],
+        c1: [ProjectivePoint::GENERATOR; 32],
+        c2: [ProjectivePoint::GENERATOR; 32],
     };
 
     let bytes = serde_bare::to_vec(&ciphertext).unwrap();
+    assert_eq!(bytes.len(), 64 * NistP256::POINT_BYTES);
     let ciphertext2 = serde_bare::from_slice(&bytes).unwrap();
     assert_eq!(ciphertext, ciphertext2);
 

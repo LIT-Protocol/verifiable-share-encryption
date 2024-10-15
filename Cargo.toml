@@ -4,9 +4,8 @@ version = "0.3.0"
 edition = "2021"
 
 [features]
-
-[dependencies.anyhow]
-version = "1.0"
+default = ["v1"]
+v1 = []
 
 [dependencies.bulletproofs]
 version = "*"
@@ -16,37 +15,26 @@ features = [
     "curve25519",
     "k256",
     "p256",
+    "p384",
     "bls12_381",
     "bls12_381_std",
     "ed448"
 ]
 git = "https://github.com/LIT-Protocol/bulletproofs.git"
 
-[dependencies.data-encoding]
-version = "2.6"
-
-[dependencies.ed25519-dalek]
-version = "2.1.1"
-
-[dependencies.rand_core]
-version = "0.6"
-features = ["std"]
-
-[dependencies.rayon]
-version = "1.10"
-
-[dependencies.serde]
-version = "1.0"
-features = ["derive"]
-
-[dependencies.thiserror]
-version = "1.0"
-
 [dependencies]
+anyhow = "1.0"
+data-encoding = "2.6"
+ed25519-dalek = "2.1"
+elliptic-curve-tools = "0.1.2"
 legacy-vsss-rs = { version = "4.3.8", features = ["std"],  package = "vsss-rs"}
-elliptic-curve-tools = "0.1.1"
+rayon = "1.10"
+rand_core = { version = "0.6.4", features = ["std"] }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
 
 [dev-dependencies]
 rand = "0.8"
+rstest = "0.23"
 serde_bare = "0.5"
 serde_json = "1.0"

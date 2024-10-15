@@ -1,27 +1,17 @@
 use bulletproofs::BulletproofCurveArithmetic;
 use core::fmt::{self, Display, Formatter, LowerHex, UpperHex};
-use elliptic_curve_tools::prime_field;
 use serde::{Deserialize, Serialize};
 
+use super::serdes::CurveScalar;
 use crate::{Error, Result};
 
 /// A schnorr proof of knowledge of a byte
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ByteProof<C: BulletproofCurveArithmetic> {
-    #[serde(with = "prime_field")]
+    #[serde(with = "CurveScalar::<C>")]
     pub(crate) message: C::Scalar,
-    #[serde(with = "prime_field")]
+    #[serde(with = "CurveScalar::<C>")]
     pub(crate) blinder: C::Scalar,
-}
-
-#[cfg(feature = "v1")]
-impl<C: BulletproofCurveArithmetic> From<crate::v1::ByteProof<C>> for ByteProof<C> {
-    fn from(proof: crate::v1::ByteProof<C>) -> Self {
-        Self {
-            message: proof.message,
-            blinder: proof.blinder,
-        }
-    }
 }
 
 impl<C: BulletproofCurveArithmetic> Default for ByteProof<C> {
@@ -35,7 +25,7 @@ impl<C: BulletproofCurveArithmetic> Default for ByteProof<C> {
 
 impl<C: BulletproofCurveArithmetic> Display for ByteProof<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.write_fmt(f, data_encoding::HEXLOWER)
+        self.write_fmt(f, data_encoding::BASE64)
     }
 }
 
@@ -95,7 +85,7 @@ fn serialize_test() {
         blinder: bulletproofs::k256::Scalar::from(456u64),
     };
     let bytes = serde_bare::to_vec(&proof).unwrap();
-    assert_eq!(bytes.len(), 66);
+    assert_eq!(bytes.len(), 64);
     let proof2: ByteProof<bulletproofs::k256::Secp256k1> = serde_bare::from_slice(&bytes).unwrap();
     assert_eq!(proof, proof2);
 

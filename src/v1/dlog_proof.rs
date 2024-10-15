@@ -4,10 +4,10 @@ use bulletproofs::{
     BulletproofCurveArithmetic, TranscriptProtocol,
 };
 use core::fmt::{self, Display, Formatter, LowerHex, UpperHex};
-use elliptic_curve_tools::{group, prime_field};
 use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
 
+use super::serdes::{CurvePoint, CurveScalar};
 use crate::{Error, Result};
 
 pub(crate) struct DlogProofCommitting<C: BulletproofCurveArithmetic> {
@@ -39,46 +39,31 @@ impl<C: BulletproofCurveArithmetic> DlogProofCommitting<C> {
 /// A schnorr proof of discrete log of a scalar value
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DlogProof<C: BulletproofCurveArithmetic> {
-    #[serde(with = "group")]
+    #[serde(with = "CurvePoint::<C>")]
     pub(crate) c1: C::Point,
-    #[serde(with = "group")]
+    #[serde(with = "CurvePoint::<C>")]
     pub(crate) c2: C::Point,
-    #[serde(with = "group")]
+    #[serde(with = "CurvePoint::<C>")]
     pub(crate) a1: C::Point,
-    #[serde(with = "group")]
+    #[serde(with = "CurvePoint::<C>")]
     pub(crate) a2: C::Point,
-    #[serde(with = "group")]
+    #[serde(with = "CurvePoint::<C>")]
     pub(crate) a3: C::Point,
-    #[serde(with = "prime_field")]
+    #[serde(with = "CurveScalar::<C>")]
     pub(crate) message: C::Scalar,
-    #[serde(with = "prime_field")]
+    #[serde(with = "CurveScalar::<C>")]
     pub(crate) blinding: C::Scalar,
-}
-
-#[cfg(feature = "v1")]
-impl<C: BulletproofCurveArithmetic> From<crate::v1::DlogProof<C>> for DlogProof<C> {
-    fn from(old: crate::v1::DlogProof<C>) -> Self {
-        Self {
-            c1: old.c1,
-            c2: old.c2,
-            a1: old.a1,
-            a2: old.a2,
-            a3: old.a3,
-            message: old.message,
-            blinding: old.blinding,
-        }
-    }
 }
 
 impl<C: BulletproofCurveArithmetic> Display for DlogProof<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.write_fmt(f, data_encoding::HEXLOWER)
+        self.write_fmt(f, data_encoding::BASE64)
     }
 }
 
 impl<C: BulletproofCurveArithmetic> LowerHex for DlogProof<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        self.write_fmt(f, data_encoding::HEXLOWER)
     }
 }
 

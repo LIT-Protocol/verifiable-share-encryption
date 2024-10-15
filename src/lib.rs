@@ -4,7 +4,8 @@ mod decryption_share;
 mod dlog_proof;
 mod errors;
 mod proof;
-mod serdes;
+#[cfg(feature = "v1")]
+pub mod v1;
 
 pub use byte_proof::*;
 pub use ciphertext::*;
@@ -13,13 +14,13 @@ pub use dlog_proof::*;
 pub use errors::*;
 pub use proof::*;
 
-use legacy_vsss_rs::Share;
 use bulletproofs::{
     group::{
         ff::{Field, PrimeField},
         Group,
     },
     merlin::Transcript,
+    vsss_rs::ReadableShareSet,
     BulletproofCurveArithmetic, BulletproofGens, PedersenGens, RangeProof, TranscriptProtocol,
 };
 use rand_core::{CryptoRng, RngCore};
@@ -54,20 +55,20 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
         mut rng: impl RngCore + CryptoRng,
     ) -> (Ciphertext<Self>, Proof<Self>) {
         let mut transcript = Transcript::new(b"ElGamalVerifiableEncryption");
-        let key_repr = key_share.to_repr();
-        let key_bytes = key_repr.as_ref();
-        let mut key_segments = [0u64; 32];
-        key_segments
-            .iter_mut()
-            .zip(key_bytes.iter())
-            .for_each(|(segment, byte)| {
-                *segment = *byte as u64;
-            });
-        let mut blinders = [Self::Scalar::ZERO; 32];
-        blinders.iter_mut().for_each(|blinder| {
-            *blinder = Self::Scalar::random(&mut rng);
-        });
-        let bp_gens = BulletproofGens::new(8, 32);
+        let key_bytes = Self::scalar_to_verifiable_encryption_bytes(key_share);
+        let key_segments = key_bytes.iter().map(|b| *b as u64).collect::<Vec<_>>();
+        let blinders = (0..key_bytes.len())
+            .map(|_| Self::Scalar::random(&mut rng))
+            .collect::<Vec<_>>();
+        let blinder_blinders = (0..key_bytes.len())
+            .map(|_| Self::Scalar::random(&mut rng))
+            .collect::<Vec<_>>();
+        let c1s = blinders
+            .iter()
+            .map(|r| Self::Point::generator() * r)
+            .collect::<Vec<Self::Point>>();
+
+        let bp_gens = BulletproofGens::new(8, key_bytes.len());
         let pc_gens = PedersenGens {
             B: Self::Point::generator(),
             B_blinding: encryption_key,
@@ -82,18 +83,9 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
             &mut rng,
         )
         .unwrap();
-        let mut c1s = [Self::Point::identity(); 32];
-        c1s.iter_mut()
-            .zip(blinders.iter())
-            .for_each(|(c1, r)| *c1 = Self::Point::generator() * r);
 
-        let mut blinder_blinders = [Self::Scalar::ZERO; 32];
-        blinder_blinders
-            .iter_mut()
-            .for_each(|s| *s = Self::Scalar::random(&mut rng));
-
-        transcript.append_message(b"elgamal_segment_proofs", &[32]);
-        for i in 0..32 {
+        transcript.append_message(b"elgamal_segment_proofs", &[key_bytes.len() as u8]);
+        for i in 0..key_bytes.len() {
             transcript.append_u64(b"elgamal_segment_proofs_index", i as u64);
             transcript.append_point::<Self>(b"elgamal_segment_proofs_c1", &c1s[i]);
             transcript.append_point::<Self>(b"elgamal_segment_proofs_c2", &c2s[i]);
@@ -110,17 +102,15 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
         let challenge = transcript.challenge_scalar::<Self>(b"elgamal_segment_proofs_challenge");
         let dlog_proof = dlog_committing.finalize(challenge);
 
-        let mut byte_proofs = [ByteProof::<Self>::default(); 32];
-        byte_proofs.iter_mut().enumerate().for_each(|(i, p)| {
-            p.message = blinders[i] - challenge * Self::Scalar::from(key_bytes[i] as u64);
-            p.blinder = blinder_blinders[i] - challenge * blinders[i];
-        });
-
-        let mut c2 = [Self::Point::identity(); 32];
-        c2.iter_mut().zip(c2s.iter()).for_each(|(c2, i)| *c2 = *i);
+        let byte_proofs = (0..key_bytes.len())
+            .map(|i| ByteProof {
+                message: blinders[i] - challenge * Self::Scalar::from(key_bytes[i] as u64),
+                blinder: blinder_blinders[i] - challenge * blinders[i],
+            })
+            .collect::<Vec<_>>();
 
         (
-            Ciphertext { c1: c1s, c2 },
+            Ciphertext { c1: c1s, c2: c2s },
             Proof {
                 byte_proofs,
                 challenge,
@@ -139,8 +129,9 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
         proof: &Proof<Self>,
         authenticated_data: &[u8],
     ) -> Result<()> {
+        let key_bytes = ciphertext.c1.len();
         let mut transcript = Transcript::new(b"ElGamalVerifiableEncryption");
-        let bp_gens = BulletproofGens::new(8, 32);
+        let bp_gens = BulletproofGens::new(8, key_bytes);
         let pc_gens = PedersenGens {
             B: Self::Point::generator(),
             B_blinding: encryption_key,
@@ -150,8 +141,8 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
             .verify_multiple(&bp_gens, &pc_gens, &mut transcript, &ciphertext.c2, 8)
             .map_err(|_e| Error::InvalidRangeProof)?;
 
-        transcript.append_message(b"elgamal_segment_proofs", &[32]);
-        for i in 0..32 {
+        transcript.append_message(b"elgamal_segment_proofs", &[key_bytes as u8]);
+        for i in 0..key_bytes {
             transcript.append_u64(b"elgamal_segment_proofs_index", i as u64);
             transcript.append_point::<Self>(b"elgamal_segment_proofs_c1", &ciphertext.c1[i]);
             transcript.append_point::<Self>(b"elgamal_segment_proofs_c2", &ciphertext.c2[i]);
@@ -202,6 +193,10 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
             Err(Error::InvalidDlogProof)
         }
     }
+
+    fn scalar_to_verifiable_encryption_bytes(scalar: &Self::Scalar) -> Vec<u8> {
+        scalar.to_repr().as_ref().to_vec()
+    }
 }
 
 /// A trait for types that can use ElGamal decryption scheme for a scalar
@@ -213,9 +208,9 @@ pub trait VerifiableEncryptionDecryptor: BulletproofCurveArithmetic {
     ) -> Result<Self::Scalar> {
         use rayon::prelude::*;
 
-        let mut repr = <Self::Scalar as PrimeField>::Repr::default();
+        let mut key_bytes = vec![0u8; ciphertext.c1.len()];
 
-        repr.as_mut().par_iter_mut().enumerate().for_each(|(i, b)| {
+        key_bytes.par_iter_mut().enumerate().for_each(|(i, b)| {
             let vi = ciphertext.c2[i] - ciphertext.c1[i] * *decryption_key;
 
             for ki in 0u8..=255 {
@@ -226,7 +221,7 @@ pub trait VerifiableEncryptionDecryptor: BulletproofCurveArithmetic {
                 }
             }
         });
-        Option::<Self::Scalar>::from(Self::Scalar::from_repr(repr)).ok_or(Error::InvalidKey)
+        Self::verifiable_encryption_bytes_to_scalar(&key_bytes)
     }
 
     /// Decrypt the ciphertext and verify the decrypted value is correct
@@ -246,25 +241,24 @@ pub trait VerifiableEncryptionDecryptor: BulletproofCurveArithmetic {
     }
 
     /// Decrypt the ciphertext given the decryption shares
-    fn decrypt_with_shares<P: Share<Identifier = u8>>(
-        decryption_shares: &[DecryptionShare<P, Self>],
+    fn decrypt_with_shares(
+        decryption_shares: &[DecryptionShare<Self>],
         ciphertext: &Ciphertext<Self>,
     ) -> Result<Self::Scalar> {
         use rayon::prelude::*;
 
-        let mut repr = <Self::Scalar as PrimeField>::Repr::default();
-        let mut decryption_parts = Vec::with_capacity(32);
-        for i in 0..32 {
+        let mut key_bytes = vec![0u8; ciphertext.c1.len()];
+        let mut decryption_parts = Vec::with_capacity(ciphertext.c1.len());
+        for i in 0..ciphertext.c1.len() {
             let parts = decryption_shares
                 .iter()
-                .map(|s| s.inner[i].clone())
+                .map(|s| s.inner[i])
                 .collect::<Vec<_>>();
-            let share = legacy_vsss_rs::combine_shares_group::<Self::Point, u8, P>(&parts)
-                .map_err(|_| Error::InvalidDecryptionShare)?;
-            decryption_parts.push(share);
+            let share = parts.combine().map_err(|_| Error::InvalidDecryptionShare)?;
+            decryption_parts.push(share.0);
         }
 
-        repr.as_mut()
+        key_bytes
             .par_iter_mut()
             .enumerate()
             .zip(decryption_parts.par_iter())
@@ -279,7 +273,7 @@ pub trait VerifiableEncryptionDecryptor: BulletproofCurveArithmetic {
                     }
                 }
             });
-        Option::<Self::Scalar>::from(Self::Scalar::from_repr(repr)).ok_or(Error::InvalidKey)
+        Self::verifiable_encryption_bytes_to_scalar(&key_bytes)
     }
 
     /// Decrypt the ciphertext using the decryption key and unblind using the blinding factor
@@ -293,13 +287,20 @@ pub trait VerifiableEncryptionDecryptor: BulletproofCurveArithmetic {
     }
 
     /// Decrypt the ciphertext given the decryption shares and unblind using the blinding factor
-    fn decrypt_with_shares_and_unblind<P: Share<Identifier = u8>>(
+    fn decrypt_with_shares_and_unblind(
         blinder: &Self::Scalar,
-        decryption_shares: &[DecryptionShare<P, Self>],
+        decryption_shares: &[DecryptionShare<Self>],
         ciphertext: &Ciphertext<Self>,
     ) -> Result<Self::Scalar> {
         let blind_plaintext = Self::decrypt_with_shares(decryption_shares, ciphertext)?;
         Ok(blind_plaintext - blinder)
+    }
+
+    /// Convert the verifiable encryption bytes to a scalar
+    fn verifiable_encryption_bytes_to_scalar(bytes: &[u8]) -> Result<Self::Scalar> {
+        let mut repr = <Self::Scalar as PrimeField>::Repr::default();
+        repr.as_mut().copy_from_slice(bytes);
+        Option::<Self::Scalar>::from(Self::Scalar::from_repr(repr)).ok_or(Error::InvalidKey)
     }
 }
 
@@ -322,6 +323,38 @@ impl VerifiableEncryptionDecryptor for bulletproofs::bls12_381_plus::Bls12381G1 
 impl VerifiableEncryption for bulletproofs::blstrs_plus::Bls12381G1 {}
 
 impl VerifiableEncryptionDecryptor for bulletproofs::blstrs_plus::Bls12381G1 {}
+
+impl VerifiableEncryption for bulletproofs::p384::NistP384 {
+    fn scalar_to_verifiable_encryption_bytes(scalar: &Self::Scalar) -> Vec<u8> {
+        let mut bytes = vec![0u8; 64];
+        bytes[16..].copy_from_slice(scalar.to_repr().as_ref());
+        bytes
+    }
+}
+
+impl VerifiableEncryptionDecryptor for bulletproofs::p384::NistP384 {
+    fn verifiable_encryption_bytes_to_scalar(bytes: &[u8]) -> Result<Self::Scalar> {
+        let mut repr = <Self::Scalar as PrimeField>::Repr::default();
+        repr.copy_from_slice(&bytes[16..]);
+        Option::<Self::Scalar>::from(Self::Scalar::from_repr(repr)).ok_or(Error::InvalidKey)
+    }
+}
+
+impl VerifiableEncryption for bulletproofs::ed448::Ed448 {
+    fn scalar_to_verifiable_encryption_bytes(scalar: &Self::Scalar) -> Vec<u8> {
+        let mut bytes = vec![0u8; 64];
+        bytes[..57].copy_from_slice(scalar.to_repr().as_ref());
+        bytes
+    }
+}
+
+impl VerifiableEncryptionDecryptor for bulletproofs::ed448::Ed448 {
+    fn verifiable_encryption_bytes_to_scalar(bytes: &[u8]) -> Result<Self::Scalar> {
+        let mut repr = <Self::Scalar as PrimeField>::Repr::default();
+        repr.copy_from_slice(&bytes[..57]);
+        Option::<Self::Scalar>::from(Self::Scalar::from_repr(repr)).ok_or(Error::InvalidKey)
+    }
+}
 
 pub trait KeyToScalar {
     type Curve: BulletproofCurveArithmetic;
@@ -436,19 +469,20 @@ fn blind_encrypt_and_prove_works<C: VerifiableEncryption + VerifiableEncryptionD
     signing_key: C::Scalar,
     _verification_key: C::Point,
 ) {
+    use bulletproofs::vsss_rs::{shamir, DefaultShare, IdentifierPrimeField};
+
+    let sk = IdentifierPrimeField(signing_key);
+
     let mut rng = rand::thread_rng();
-    let shares = legacy_vsss_rs::shamir::split_secret::<C::Scalar, u8, Vec<u8>>(
-        2,
-        3,
-        signing_key,
-        &mut rng,
-    )
+    let shares = shamir::split_secret::<
+        DefaultShare<IdentifierPrimeField<C::Scalar>, IdentifierPrimeField<C::Scalar>>,
+    >(2, 3, &sk, &mut rng)
     .unwrap();
     let decryption_key = C::Scalar::random(&mut rng);
     let encryption_key = C::Point::generator() * decryption_key;
     let blinder = C::Scalar::random(&mut rng);
 
-    let share1 = shares[0].as_field_element::<C::Scalar>().unwrap();
+    let share1 = shares[0].value.0;
     let (ciphertext, proof) =
         C::blind_encrypt_and_prove(encryption_key, &share1, &blinder, &[], &mut rng);
     let share_verification_key = C::Point::generator() * share1;
@@ -548,23 +582,45 @@ fn encrypt_and_prove_blst12381_works() {
     encrypt_and_prove_works::<Bls12381G1>(signing_key, verification_key);
 }
 
+#[test]
+fn encrypt_and_prove_p384_works() {
+    use bulletproofs::p384::{NistP384, ProjectivePoint, Scalar};
+
+    let mut rng = rand::thread_rng();
+    let signing_key = Scalar::random(&mut rng);
+    let verification_key = ProjectivePoint::GENERATOR * signing_key;
+
+    encrypt_and_prove_works::<NistP384>(signing_key, verification_key);
+}
+
+#[test]
+fn encrypt_and_prove_ed448_works() {
+    use bulletproofs::ed448::{Ed448, EdwardsPoint, Scalar};
+
+    let mut rng = rand::thread_rng();
+    let signing_key = Scalar::random(&mut rng);
+    let verification_key = EdwardsPoint::GENERATOR * signing_key;
+
+    encrypt_and_prove_works::<Ed448>(signing_key, verification_key);
+}
+
 #[cfg(test)]
 fn encrypt_and_prove_works<C: VerifiableEncryption + VerifiableEncryptionDecryptor>(
     signing_key: C::Scalar,
     _verification_key: C::Point,
 ) {
+    use bulletproofs::vsss_rs::{shamir, DefaultShare, IdentifierPrimeField};
+
     let mut rng = rand::thread_rng();
-    let shares = legacy_vsss_rs::shamir::split_secret::<C::Scalar, u8, Vec<u8>>(
-        2,
-        3,
-        signing_key,
-        &mut rng,
-    )
+    let sk = IdentifierPrimeField(signing_key);
+    let shares = shamir::split_secret::<
+        DefaultShare<IdentifierPrimeField<C::Scalar>, IdentifierPrimeField<C::Scalar>>,
+    >(2, 3, &sk, &mut rng)
     .unwrap();
     let decryption_key = C::Scalar::random(&mut rng);
     let encryption_key = C::Point::generator() * decryption_key;
 
-    let share1 = shares[0].as_field_element::<C::Scalar>().unwrap();
+    let share1 = shares[0].value.0;
     let (ciphertext, proof) = C::encrypt_and_prove(encryption_key, &share1, &[], &mut rng);
     let share_verification_key = C::Point::generator() * share1;
 
@@ -609,6 +665,11 @@ fn bls12381_proof_serde_works() {
 #[test]
 fn blst12381_proof_serde_works() {
     ciphertext_proof_serde_works::<bulletproofs::blstrs_plus::Bls12381G1>();
+}
+
+#[test]
+fn ed448_proof_serde_works() {
+    ciphertext_proof_serde_works::<bulletproofs::ed448::Ed448>();
 }
 
 #[cfg(test)]
