@@ -9,9 +9,9 @@ use crate::{Error, Result};
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ByteProof<C: BulletproofCurveArithmetic> {
     #[serde(with = "CurveScalar::<C>")]
-    pub(crate) message: C::Scalar,
+    pub message: C::Scalar,
     #[serde(with = "CurveScalar::<C>")]
-    pub(crate) blinder: C::Scalar,
+    pub blinder: C::Scalar,
 }
 
 impl<C: BulletproofCurveArithmetic> Default for ByteProof<C> {

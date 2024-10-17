@@ -10,9 +10,9 @@ use crate::{Error, Result};
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ciphertext<C: BulletproofCurveArithmetic> {
     #[serde(with = "group_vec")]
-    pub(crate) c1: Vec<C::Point>,
+    pub c1: Vec<C::Point>,
     #[serde(with = "group_vec")]
-    pub(crate) c2: Vec<C::Point>,
+    pub c2: Vec<C::Point>,
 }
 
 #[cfg(feature = "v1")]

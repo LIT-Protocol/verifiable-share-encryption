@@ -11,9 +11,9 @@ use crate::{Error, Result};
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ciphertext<C: BulletproofCurveArithmetic> {
     #[serde(with = "PointArray::<C>")]
-    pub(crate) c1: [C::Point; 32],
+    pub c1: [C::Point; 32],
     #[serde(with = "PointArray::<C>")]
-    pub(crate) c2: [C::Point; 32],
+    pub c2: [C::Point; 32],
 }
 
 impl<C: BulletproofCurveArithmetic> Default for Ciphertext<C> {

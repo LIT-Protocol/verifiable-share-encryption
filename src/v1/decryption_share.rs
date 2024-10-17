@@ -9,8 +9,8 @@ use super::{Ciphertext, VerifiableEncryption, VerifiableEncryptionDecryptor};
 /// A decryption key share that allows for decryption of a ciphertext
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct DecryptionShare<P: Share<Identifier = u8>, C: BulletproofCurveArithmetic> {
-    pub(crate) inner: [P; 32],
-    pub(crate) _marker: PhantomData<C>,
+    pub inner: [P; 32],
+    pub _marker: PhantomData<C>,
 }
 
 impl<P: Share<Identifier = u8>, C: VerifiableEncryption + VerifiableEncryptionDecryptor> Serialize

@@ -14,8 +14,8 @@ pub type SecretShare<F, G> = DefaultShare<IdentifierPrimeField<F>, ValueGroup<G>
 /// A decryption key share that allows for decryption of a ciphertext
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct DecryptionShare<C: BulletproofCurveArithmetic> {
-    pub(crate) inner: Vec<SecretShare<C::Scalar, C::Point>>,
-    pub(crate) _marker: PhantomData<C>,
+    pub inner: Vec<SecretShare<C::Scalar, C::Point>>,
+    pub _marker: PhantomData<C>,
 }
 
 #[cfg(feature = "v1")]

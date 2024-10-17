@@ -9,15 +9,15 @@ use crate::{ByteProof, DlogProof};
 pub struct Proof<C: BulletproofCurveArithmetic> {
     #[serde(bound(serialize = "ByteProof<C>: Serialize"))]
     #[serde(bound(deserialize = "ByteProof<C>: Deserialize<'de>"))]
-    pub(crate) byte_proofs: Vec<ByteProof<C>>,
+    pub byte_proofs: Vec<ByteProof<C>>,
     #[serde(with = "prime_field")]
-    pub(crate) challenge: C::Scalar,
+    pub challenge: C::Scalar,
     #[serde(bound(serialize = "DlogProof<C>: Serialize"))]
     #[serde(bound(deserialize = "DlogProof<C>: Deserialize<'de>"))]
-    pub(crate) dlog_proof: DlogProof<C>,
+    pub dlog_proof: DlogProof<C>,
     #[serde(bound(serialize = "RangeProof<C>: Serialize"))]
     #[serde(bound(deserialize = "RangeProof<C>: Deserialize<'de>"))]
-    pub(crate) range_proof: RangeProof<C>,
+    pub range_proof: RangeProof<C>,
 }
 
 #[cfg(feature = "v1")]

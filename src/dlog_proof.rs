@@ -40,19 +40,19 @@ impl<C: BulletproofCurveArithmetic> DlogProofCommitting<C> {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DlogProof<C: BulletproofCurveArithmetic> {
     #[serde(with = "group")]
-    pub(crate) c1: C::Point,
+    pub c1: C::Point,
     #[serde(with = "group")]
-    pub(crate) c2: C::Point,
+    pub c2: C::Point,
     #[serde(with = "group")]
-    pub(crate) a1: C::Point,
+    pub a1: C::Point,
     #[serde(with = "group")]
-    pub(crate) a2: C::Point,
+    pub a2: C::Point,
     #[serde(with = "group")]
-    pub(crate) a3: C::Point,
+    pub a3: C::Point,
     #[serde(with = "prime_field")]
-    pub(crate) message: C::Scalar,
+    pub message: C::Scalar,
     #[serde(with = "prime_field")]
-    pub(crate) blinding: C::Scalar,
+    pub blinding: C::Scalar,
 }
 
 #[cfg(feature = "v1")]
