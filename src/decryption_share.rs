@@ -44,6 +44,40 @@ impl<
     }
 }
 
+#[cfg(feature = "v1")]
+impl<
+        P: legacy_vsss_rs::Share<Identifier = u8>,
+        C: VerifiableEncryption + VerifiableEncryptionDecryptor,
+    > From<DecryptionShare<C>> for crate::v1::DecryptionShare<P, C>
+{
+    fn from(value: DecryptionShare<C>) -> Self {
+        use bulletproofs::group::ff::PrimeField;
+        use legacy_vsss_rs::Share;
+
+        let repr = C::Point::default().to_bytes();
+        let share_len = repr.as_ref().len();
+        let mut inner = crate::v1::default_shares(share_len);
+
+        for (old, new) in inner.iter_mut().zip(value.inner.iter()) {
+            let new_repr = new.identifier.0.to_repr();
+            let new_repr_bytes = new_repr.as_ref();
+            let identifier = if new_repr_bytes[0] != 0 {
+                new_repr_bytes[0]
+            } else {
+                let id = new_repr_bytes.last().expect("to be not zero");
+                assert_ne!(id, &0);
+                *id
+            };
+            let repr = new.value.0.to_bytes();
+            *old = Vec::with_identifier_and_value(identifier, repr.as_ref());
+        }
+        Self {
+            inner,
+            _marker: PhantomData,
+        }
+    }
+}
+
 impl<C: VerifiableEncryption + VerifiableEncryptionDecryptor> DecryptionShare<C> {
     /// Create a new decryption share from a key share and a ciphertext
     pub fn new(

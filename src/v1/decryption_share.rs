@@ -225,7 +225,7 @@ impl<P: Share<Identifier = u8>, C: VerifiableEncryption + VerifiableEncryptionDe
     }
 }
 
-fn default_shares<P: Share<Identifier = u8>>(size: usize) -> [P; 32] {
+pub(crate) fn default_shares<P: Share<Identifier = u8>>(size: usize) -> [P; 32] {
     [
         P::empty_share_with_capacity(size),
         P::empty_share_with_capacity(size),
