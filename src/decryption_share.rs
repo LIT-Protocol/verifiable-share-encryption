@@ -52,7 +52,6 @@ impl<
 {
     fn from(value: DecryptionShare<C>) -> Self {
         use bulletproofs::group::ff::PrimeField;
-        use legacy_vsss_rs::Share;
 
         let repr = C::Point::default().to_bytes();
         let share_len = repr.as_ref().len();
@@ -69,7 +68,7 @@ impl<
                 *id
             };
             let repr = new.value.0.to_bytes();
-            *old = Vec::with_identifier_and_value(identifier, repr.as_ref());
+            *old = P::with_identifier_and_value(identifier, repr.as_ref());
         }
         Self {
             inner,
