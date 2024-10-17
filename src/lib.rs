@@ -14,6 +14,11 @@ pub use dlog_proof::*;
 pub use errors::*;
 pub use proof::*;
 
+pub use bulletproofs::vsss_rs;
+
+#[cfg(feature = "v1")]
+pub use legacy_vsss_rs;
+
 use bulletproofs::{
     group::{
         ff::{Field, PrimeField},
