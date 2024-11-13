@@ -20,6 +20,7 @@ features = [
     "bls12_381_std"
 ]
 git = "https://github.com/LIT-Protocol/bulletproofs.git"
+branch = "datil"
 
 [dependencies.data-encoding]
 version = "2.3"
