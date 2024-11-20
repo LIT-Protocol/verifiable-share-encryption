@@ -361,6 +361,14 @@ impl VerifiableEncryptionDecryptor for bulletproofs::ed448::Ed448 {
     }
 }
 
+impl VerifiableEncryption for bulletproofs::JubJub {}
+
+impl VerifiableEncryptionDecryptor for bulletproofs::JubJub {}
+
+impl VerifiableEncryption for bulletproofs::Decaf377 {}
+
+impl VerifiableEncryptionDecryptor for bulletproofs::Decaf377 {}
+
 pub trait KeyToScalar {
     type Curve: BulletproofCurveArithmetic;
 
