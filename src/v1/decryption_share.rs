@@ -273,8 +273,8 @@ fn decryption_share_test_p256() {
 }
 
 #[test]
-fn decryption_share_test_curve25519() {
-    decryption_share_test::<bulletproofs::Curve25519>()
+fn decryption_share_test_ristretto25519() {
+    decryption_share_test::<bulletproofs::Ristretto25519>()
 }
 
 #[test]
@@ -319,8 +319,8 @@ fn decryption_share_serialize_test_p256() {
 }
 
 #[test]
-fn decryption_share_serialize_test_curve25519() {
-    decryption_share_serialize_test::<bulletproofs::Curve25519>()
+fn decryption_share_serialize_test_ristretto25519() {
+    decryption_share_serialize_test::<bulletproofs::Ristretto25519>()
 }
 
 #[test]

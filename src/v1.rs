@@ -310,9 +310,13 @@ impl VerifiableEncryption for bulletproofs::p256::NistP256 {}
 
 impl VerifiableEncryptionDecryptor for bulletproofs::p256::NistP256 {}
 
-impl VerifiableEncryption for bulletproofs::Curve25519 {}
+impl VerifiableEncryption for bulletproofs::Ristretto25519 {}
 
-impl VerifiableEncryptionDecryptor for bulletproofs::Curve25519 {}
+impl VerifiableEncryptionDecryptor for bulletproofs::Ristretto25519 {}
+
+impl VerifiableEncryption for bulletproofs::Ed25519 {}
+
+impl VerifiableEncryptionDecryptor for bulletproofs::Ed25519 {}
 
 impl VerifiableEncryption for bulletproofs::bls12_381_plus::Bls12381G1 {}
 

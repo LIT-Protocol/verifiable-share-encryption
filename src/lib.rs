@@ -317,9 +317,13 @@ impl VerifiableEncryption for bulletproofs::p256::NistP256 {}
 
 impl VerifiableEncryptionDecryptor for bulletproofs::p256::NistP256 {}
 
-impl VerifiableEncryption for bulletproofs::Curve25519 {}
+impl VerifiableEncryption for bulletproofs::Ristretto25519 {}
 
-impl VerifiableEncryptionDecryptor for bulletproofs::Curve25519 {}
+impl VerifiableEncryptionDecryptor for bulletproofs::Ristretto25519 {}
+
+impl VerifiableEncryption for bulletproofs::Ed25519 {}
+
+impl VerifiableEncryptionDecryptor for bulletproofs::Ed25519 {}
 
 impl VerifiableEncryption for bulletproofs::bls12_381_plus::Bls12381G1 {}
 
@@ -442,17 +446,31 @@ fn blind_encrypt_and_prove_p256_works() {
 }
 
 #[test]
-fn blind_encrypt_and_prove_curve25519_works() {
+fn blind_encrypt_and_prove_ristretto25519_works() {
     use bulletproofs::{
         vsss_rs::curve25519::{WrappedRistretto, WrappedScalar},
-        Curve25519,
+        Ristretto25519,
     };
 
     let mut rng = rand::thread_rng();
     let signing_key = WrappedScalar::random(&mut rng);
     let verification_key = WrappedRistretto::generator() * signing_key;
 
-    blind_encrypt_and_prove_works::<Curve25519>(signing_key, verification_key);
+    blind_encrypt_and_prove_works::<Ristretto25519>(signing_key, verification_key);
+}
+
+#[test]
+fn blind_encrypt_and_prove_ed25519_works() {
+    use bulletproofs::{
+        vsss_rs::curve25519::{WrappedEdwards, WrappedScalar},
+        Ed25519,
+    };
+
+    let mut rng = rand::thread_rng();
+    let signing_key = WrappedScalar::random(&mut rng);
+    let verification_key = WrappedEdwards::generator() * signing_key;
+
+    blind_encrypt_and_prove_works::<Ed25519>(signing_key, verification_key);
 }
 
 #[test]
@@ -560,17 +578,31 @@ fn encrypt_and_prove_p256_works() {
 }
 
 #[test]
-fn encrypt_and_prove_curve25519_works() {
+fn encrypt_and_prove_ristretto25519_works() {
     use bulletproofs::{
         vsss_rs::curve25519::{WrappedRistretto, WrappedScalar},
-        Curve25519,
+        Ristretto25519,
     };
 
     let mut rng = rand::thread_rng();
     let signing_key = WrappedScalar::random(&mut rng);
     let verification_key = WrappedRistretto::generator() * signing_key;
 
-    encrypt_and_prove_works::<Curve25519>(signing_key, verification_key);
+    encrypt_and_prove_works::<Ristretto25519>(signing_key, verification_key);
+}
+
+#[test]
+fn encrypt_and_prove_ed25519_works() {
+    use bulletproofs::{
+        vsss_rs::curve25519::{WrappedEdwards, WrappedScalar},
+        Ed25519,
+    };
+
+    let mut rng = rand::thread_rng();
+    let signing_key = WrappedScalar::random(&mut rng);
+    let verification_key = WrappedEdwards::generator() * signing_key;
+
+    encrypt_and_prove_works::<Ed25519>(signing_key, verification_key);
 }
 
 #[test]
@@ -666,8 +698,13 @@ fn p256_proof_serde_works() {
 }
 
 #[test]
-fn curve25519_proof_serde_works() {
-    ciphertext_proof_serde_works::<bulletproofs::Curve25519>();
+fn ristretto25519_proof_serde_works() {
+    ciphertext_proof_serde_works::<bulletproofs::Ristretto25519>();
+}
+
+#[test]
+fn ed25519_proof_serde_works() {
+    ciphertext_proof_serde_works::<bulletproofs::Ed25519>();
 }
 
 #[test]
