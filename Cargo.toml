@@ -23,6 +23,7 @@ features = [
     "decaf377",
 ]
 git = "https://github.com/LIT-Protocol/bulletproofs.git"
+rev = "a71cebebd0f1cf2364cefaf2e35ff15c94132427"
 
 [dependencies]
 anyhow = "1.0"
