@@ -31,6 +31,9 @@ use bulletproofs::{
 use rand_core::{CryptoRng, RngCore};
 use std::ops::Deref;
 
+#[cfg(test)]
+use vsss_rs::{shamir, DefaultShare, IdentifierPrimeField};
+
 /// A trait for types that can use ElGamal encryption scheme for a scalar
 pub trait VerifiableEncryption: BulletproofCurveArithmetic {
     /// Applies blind encryption to the given scalar
@@ -545,6 +548,96 @@ fn blind_encrypt_and_prove_works<C: VerifiableEncryption + VerifiableEncryptionD
     assert_ne!(res.unwrap(), share1);
 
     let res = C::decrypt_and_unblind(&blinder, &decryption_key, &ciphertext);
+    assert!(res.is_ok());
+    assert_eq!(res.unwrap(), share1);
+}
+
+#[test]
+fn blind_encrypt_and_proof_random_ids_bls12381_works() {
+    use bulletproofs::blstrs_plus::{Bls12381G1, G1Projective, Scalar};
+    use rand_core::SeedableRng;
+
+    type BlsShare = DefaultShare<IdentifierPrimeField<Scalar>, IdentifierPrimeField<Scalar>>;
+
+    let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(0);
+    let signing_key = Scalar::random(&mut rng);
+
+    let peers = [
+        IdentifierPrimeField(Scalar::random(&mut rng)),
+        IdentifierPrimeField(Scalar::random(&mut rng)),
+        IdentifierPrimeField(Scalar::random(&mut rng)),
+    ];
+    let peer_gen = vsss_rs::ParticipantIdGeneratorType::list(&peers);
+
+    let sk = IdentifierPrimeField(signing_key);
+
+    let shares = shamir::split_secret_with_participant_generator::<BlsShare>(
+        2,
+        3,
+        &sk,
+        &mut rng,
+        &[peer_gen],
+    )
+    .unwrap();
+    let decryption_key = Scalar::random(&mut rng);
+    let encryption_key = G1Projective::GENERATOR * decryption_key;
+    let blinder = Scalar::random(&mut rng);
+
+    let share1 = shares[0].value.0;
+    let (ciphertext, proof) =
+        Bls12381G1::blind_encrypt_and_prove(encryption_key, &share1, &blinder, &[], &mut rng);
+    let share_verification_key = G1Projective::GENERATOR * share1;
+
+    let res = Bls12381G1::verify(
+        encryption_key,
+        share_verification_key,
+        &ciphertext,
+        &proof,
+        &[],
+    );
+    assert!(res.is_err());
+    let share_verification_key = G1Projective::GENERATOR * (share1 + blinder);
+    let res = Bls12381G1::verify(
+        encryption_key,
+        share_verification_key,
+        &ciphertext,
+        &proof,
+        &[],
+    );
+    assert!(res.is_ok());
+
+    let res = Bls12381G1::decrypt(&decryption_key, &ciphertext);
+    assert!(res.is_ok());
+    assert_ne!(res.unwrap(), share1);
+
+    let res = Bls12381G1::decrypt_and_verify(&decryption_key, &ciphertext, &proof);
+    assert!(res.is_ok());
+    assert_ne!(res.unwrap(), share1);
+
+    let res = Bls12381G1::decrypt_and_unblind(&blinder, &decryption_key, &ciphertext);
+    assert!(res.is_ok());
+    assert_eq!(res.unwrap(), share1);
+
+    let peers = [
+        IdentifierPrimeField(Scalar::random(&mut rng)),
+        IdentifierPrimeField(Scalar::random(&mut rng)),
+        IdentifierPrimeField(Scalar::random(&mut rng)),
+    ];
+    let peer_gen = vsss_rs::ParticipantIdGeneratorType::list(&peers);
+    let decrypt_shares = shamir::split_secret_with_participant_generator::<BlsShare>(
+        2,
+        3,
+        &IdentifierPrimeField(decryption_key),
+        &mut rng,
+        &[peer_gen],
+    )
+    .unwrap();
+    let decryption_shares = decrypt_shares
+        .iter()
+        .map(|s| DecryptionShare::new(s, &ciphertext))
+        .collect::<Vec<_>>();
+    let res =
+        Bls12381G1::decrypt_with_shares_and_unblind(&blinder, &decryption_shares, &ciphertext);
     assert!(res.is_ok());
     assert_eq!(res.unwrap(), share1);
 }
