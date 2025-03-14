@@ -91,13 +91,13 @@ impl<C: BulletproofCurveArithmetic> UpperHex for DlogProof<C> {
 impl<C: BulletproofCurveArithmetic> DlogProof<C> {
     pub(crate) fn create(
         encryption_key: C::Point,
-        key_share: C::Scalar,
+        key_share: &C::Scalar,
+        r: &C::Scalar,
         transcript: &mut Transcript,
         mut rng: impl RngCore,
     ) -> DlogProofCommitting<C> {
         let pk_x = C::Point::generator() * key_share;
 
-        let r = C::Scalar::random(&mut rng);
         let c1 = C::Point::generator() * r;
         let c2 = pk_x + encryption_key * r;
 
@@ -123,8 +123,8 @@ impl<C: BulletproofCurveArithmetic> DlogProof<C> {
             a1,
             a2,
             a3,
-            x: key_share,
-            r,
+            x: *key_share,
+            r: *r,
             r1,
             r2,
         }

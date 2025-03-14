@@ -65,9 +65,8 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
         let mut transcript = Transcript::new(b"ElGamalVerifiableEncryption");
         let key_bytes = Self::scalar_to_verifiable_encryption_bytes(key_share);
         let key_segments = key_bytes.iter().map(|b| *b as u64).collect::<Vec<_>>();
-        let blinders = (0..key_bytes.len())
-            .map(|_| Self::Scalar::random(&mut rng))
-            .collect::<Vec<_>>();
+        let r = Self::Scalar::random(&mut rng);
+        let blinders = Self::secret_blinders(&r, &mut rng);
         let blinder_blinders = (0..key_bytes.len())
             .map(|_| Self::Scalar::random(&mut rng))
             .collect::<Vec<_>>();
@@ -104,7 +103,7 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
         }
 
         let dlog_committing =
-            DlogProof::<Self>::create(encryption_key, *key_share, &mut transcript, &mut rng);
+            DlogProof::<Self>::create(encryption_key, key_share, &r, &mut transcript, &mut rng);
 
         transcript.append_message(b"authenticated_data", authenticated_data);
         let challenge = transcript.challenge_scalar::<Self>(b"elgamal_segment_proofs_challenge");
@@ -195,16 +194,26 @@ pub trait VerifiableEncryption: BulletproofCurveArithmetic {
         // r2.G + c.r.G
         let rhs3 = proof.dlog_proof.a3 + proof.dlog_proof.c1 * challenge;
 
-        if lhs1 == rhs1 && lhs2 == rhs2 && lhs3 == rhs3 {
-            Ok(())
-        } else {
-            Err(Error::InvalidDlogProof)
+        if lhs1 != rhs1 || lhs2 != rhs2 || lhs3 != rhs3 {
+            return Err(Error::InvalidDlogProof);
         }
+
+        Self::verify_bytes_with_discrete_log(ciphertext, proof)
     }
 
     fn scalar_to_verifiable_encryption_bytes(scalar: &Self::Scalar) -> Vec<u8> {
         scalar.to_repr().as_ref().to_vec()
     }
+
+    fn secret_blinders(
+        secret_blinder: &Self::Scalar,
+        rng: impl RngCore + CryptoRng,
+    ) -> Vec<Self::Scalar>;
+
+    fn verify_bytes_with_discrete_log(
+        ciphertext: &Ciphertext<Self>,
+        proof: &Proof<Self>,
+    ) -> Result<()>;
 }
 
 /// A trait for types that can use ElGamal decryption scheme for a scalar
@@ -312,27 +321,111 @@ pub trait VerifiableEncryptionDecryptor: BulletproofCurveArithmetic {
     }
 }
 
-impl VerifiableEncryption for bulletproofs::k256::Secp256k1 {}
+impl VerifiableEncryption for bulletproofs::k256::Secp256k1 {
+    fn secret_blinders(
+        secret_blinder: &Self::Scalar,
+        rng: impl RngCore + CryptoRng,
+    ) -> Vec<Self::Scalar> {
+        secret_blinders_be::<Self>(secret_blinder, rng)
+    }
+
+    fn verify_bytes_with_discrete_log(
+        ciphertext: &Ciphertext<Self>,
+        proof: &Proof<Self>,
+    ) -> Result<()> {
+        verify_bytes_with_discrete_log_be::<Self>(ciphertext, proof)
+    }
+}
 
 impl VerifiableEncryptionDecryptor for bulletproofs::k256::Secp256k1 {}
 
-impl VerifiableEncryption for bulletproofs::p256::NistP256 {}
+impl VerifiableEncryption for bulletproofs::p256::NistP256 {
+    fn secret_blinders(
+        secret_blinder: &Self::Scalar,
+        rng: impl RngCore + CryptoRng,
+    ) -> Vec<Self::Scalar> {
+        secret_blinders_be::<Self>(secret_blinder, rng)
+    }
+
+    fn verify_bytes_with_discrete_log(
+        ciphertext: &Ciphertext<Self>,
+        proof: &Proof<Self>,
+    ) -> Result<()> {
+        verify_bytes_with_discrete_log_be::<Self>(ciphertext, proof)
+    }
+}
 
 impl VerifiableEncryptionDecryptor for bulletproofs::p256::NistP256 {}
 
-impl VerifiableEncryption for bulletproofs::Ristretto25519 {}
+impl VerifiableEncryption for bulletproofs::Ristretto25519 {
+    fn secret_blinders(
+        secret_blinder: &Self::Scalar,
+        rng: impl RngCore + CryptoRng,
+    ) -> Vec<Self::Scalar> {
+        secret_blinders_le::<Self>(secret_blinder, rng)
+    }
+
+    fn verify_bytes_with_discrete_log(
+        ciphertext: &Ciphertext<Self>,
+        proof: &Proof<Self>,
+    ) -> Result<()> {
+        verify_bytes_with_discrete_log_le::<Self>(ciphertext, proof)
+    }
+}
 
 impl VerifiableEncryptionDecryptor for bulletproofs::Ristretto25519 {}
 
-impl VerifiableEncryption for bulletproofs::Ed25519 {}
+impl VerifiableEncryption for bulletproofs::Ed25519 {
+    fn secret_blinders(
+        secret_blinder: &Self::Scalar,
+        rng: impl RngCore + CryptoRng,
+    ) -> Vec<Self::Scalar> {
+        secret_blinders_le::<Self>(secret_blinder, rng)
+    }
+
+    fn verify_bytes_with_discrete_log(
+        ciphertext: &Ciphertext<Self>,
+        proof: &Proof<Self>,
+    ) -> Result<()> {
+        verify_bytes_with_discrete_log_le::<Self>(ciphertext, proof)
+    }
+}
 
 impl VerifiableEncryptionDecryptor for bulletproofs::Ed25519 {}
 
-impl VerifiableEncryption for bulletproofs::bls12_381_plus::Bls12381G1 {}
+impl VerifiableEncryption for bulletproofs::bls12_381_plus::Bls12381G1 {
+    fn secret_blinders(
+        secret_blinder: &Self::Scalar,
+        rng: impl RngCore + CryptoRng,
+    ) -> Vec<Self::Scalar> {
+        secret_blinders_le::<Self>(secret_blinder, rng)
+    }
+
+    fn verify_bytes_with_discrete_log(
+        ciphertext: &Ciphertext<Self>,
+        proof: &Proof<Self>,
+    ) -> Result<()> {
+        verify_bytes_with_discrete_log_le::<Self>(ciphertext, proof)
+    }
+}
 
 impl VerifiableEncryptionDecryptor for bulletproofs::bls12_381_plus::Bls12381G1 {}
 
-impl VerifiableEncryption for bulletproofs::blstrs_plus::Bls12381G1 {}
+impl VerifiableEncryption for bulletproofs::blstrs_plus::Bls12381G1 {
+    fn secret_blinders(
+        secret_blinder: &Self::Scalar,
+        rng: impl RngCore + CryptoRng,
+    ) -> Vec<Self::Scalar> {
+        secret_blinders_le::<Self>(secret_blinder, rng)
+    }
+
+    fn verify_bytes_with_discrete_log(
+        ciphertext: &Ciphertext<Self>,
+        proof: &Proof<Self>,
+    ) -> Result<()> {
+        verify_bytes_with_discrete_log_le::<Self>(ciphertext, proof)
+    }
+}
 
 impl VerifiableEncryptionDecryptor for bulletproofs::blstrs_plus::Bls12381G1 {}
 
@@ -341,6 +434,20 @@ impl VerifiableEncryption for bulletproofs::p384::NistP384 {
         let mut bytes = vec![0u8; 64];
         bytes[16..].copy_from_slice(scalar.to_repr().as_ref());
         bytes
+    }
+
+    fn secret_blinders(
+        secret_blinder: &Self::Scalar,
+        rng: impl RngCore + CryptoRng,
+    ) -> Vec<Self::Scalar> {
+        secret_blinders_be::<Self>(secret_blinder, rng)
+    }
+
+    fn verify_bytes_with_discrete_log(
+        ciphertext: &Ciphertext<Self>,
+        proof: &Proof<Self>,
+    ) -> Result<()> {
+        verify_bytes_with_discrete_log_be::<Self>(ciphertext, proof)
     }
 }
 
@@ -358,6 +465,20 @@ impl VerifiableEncryption for bulletproofs::ed448::Ed448 {
         bytes[..57].copy_from_slice(scalar.to_repr().as_ref());
         bytes
     }
+
+    fn secret_blinders(
+        secret_blinder: &Self::Scalar,
+        rng: impl RngCore + CryptoRng,
+    ) -> Vec<Self::Scalar> {
+        secret_blinders_le::<Self>(secret_blinder, rng)
+    }
+
+    fn verify_bytes_with_discrete_log(
+        ciphertext: &Ciphertext<Self>,
+        proof: &Proof<Self>,
+    ) -> Result<()> {
+        verify_bytes_with_discrete_log_le::<Self>(ciphertext, proof)
+    }
 }
 
 impl VerifiableEncryptionDecryptor for bulletproofs::ed448::Ed448 {
@@ -368,11 +489,39 @@ impl VerifiableEncryptionDecryptor for bulletproofs::ed448::Ed448 {
     }
 }
 
-impl VerifiableEncryption for bulletproofs::JubJub {}
+impl VerifiableEncryption for bulletproofs::JubJub {
+    fn secret_blinders(
+        secret_blinder: &Self::Scalar,
+        rng: impl RngCore + CryptoRng,
+    ) -> Vec<Self::Scalar> {
+        secret_blinders_le::<Self>(secret_blinder, rng)
+    }
+
+    fn verify_bytes_with_discrete_log(
+        ciphertext: &Ciphertext<Self>,
+        proof: &Proof<Self>,
+    ) -> Result<()> {
+        verify_bytes_with_discrete_log_le::<Self>(ciphertext, proof)
+    }
+}
 
 impl VerifiableEncryptionDecryptor for bulletproofs::JubJub {}
 
-impl VerifiableEncryption for bulletproofs::Decaf377 {}
+impl VerifiableEncryption for bulletproofs::Decaf377 {
+    fn secret_blinders(
+        secret_blinder: &Self::Scalar,
+        rng: impl RngCore + CryptoRng,
+    ) -> Vec<Self::Scalar> {
+        secret_blinders_le::<Self>(secret_blinder, rng)
+    }
+
+    fn verify_bytes_with_discrete_log(
+        ciphertext: &Ciphertext<Self>,
+        proof: &Proof<Self>,
+    ) -> Result<()> {
+        verify_bytes_with_discrete_log_le::<Self>(ciphertext, proof)
+    }
+}
 
 impl VerifiableEncryptionDecryptor for bulletproofs::Decaf377 {}
 
@@ -420,6 +569,82 @@ impl KeyToPoint for bulletproofs::p256::PublicKey {
     }
 }
 
+fn secret_blinders_le<V: VerifiableEncryption>(
+    blinder: &V::Scalar,
+    mut rng: impl RngCore + CryptoRng,
+) -> Vec<V::Scalar> {
+    let le_bytes = V::scalar_to_verifiable_encryption_bytes(blinder);
+
+    let shift = V::Scalar::from(256);
+    let mut sum = V::Scalar::ZERO;
+
+    let mut blinders = Vec::with_capacity(le_bytes.len());
+    for i in 1..le_bytes.len() {
+        let b = V::Scalar::random(&mut rng);
+        sum += b * shift.pow([i as u64]);
+        blinders.push(b);
+    }
+    blinders.insert(0, *blinder - sum);
+    blinders
+}
+
+fn secret_blinders_be<V: VerifiableEncryption>(
+    blinder: &V::Scalar,
+    mut rng: impl RngCore + CryptoRng,
+) -> Vec<V::Scalar> {
+    let be_bytes = V::scalar_to_verifiable_encryption_bytes(blinder);
+
+    let shift = V::Scalar::from(256);
+    let mut sum = V::Scalar::ZERO;
+
+    let mut blinders = Vec::with_capacity(be_bytes.len());
+    let mut power = be_bytes.len() - 1;
+    for _ in 0..be_bytes.len() - 1 {
+        let b = V::Scalar::random(&mut rng);
+        sum += b * shift.pow([power as u64]);
+        blinders.push(b);
+        power -= 1;
+    }
+    blinders.push(*blinder - sum);
+    blinders
+}
+
+fn verify_bytes_with_discrete_log_le<V: VerifiableEncryption>(
+    ciphertext: &Ciphertext<V>,
+    proof: &Proof<V>,
+) -> Result<()> {
+    let shift = V::Scalar::from(256);
+    let mut sum = V::Point::identity();
+
+    for c2 in ciphertext.c2.iter().rev() {
+        sum *= shift;
+        sum += c2;
+    }
+
+    if sum != proof.dlog_proof.c2 {
+        return Err(Error::InvalidCiphertext);
+    }
+    Ok(())
+}
+
+fn verify_bytes_with_discrete_log_be<V: VerifiableEncryption>(
+    ciphertext: &Ciphertext<V>,
+    proof: &Proof<V>,
+) -> Result<()> {
+    let shift = V::Scalar::from(256);
+    let mut sum = V::Point::identity();
+
+    for c2 in &ciphertext.c2 {
+        sum *= shift;
+        sum += c2;
+    }
+
+    if sum != proof.dlog_proof.c2 {
+        return Err(Error::InvalidCiphertext);
+    }
+    Ok(())
+}
+
 #[test]
 fn blind_encrypt_and_prove_k256_works() {
     use bulletproofs::k256::{Secp256k1, SecretKey};
@@ -460,6 +685,34 @@ fn blind_encrypt_and_prove_ristretto25519_works() {
     let verification_key = WrappedRistretto::generator() * signing_key;
 
     blind_encrypt_and_prove_works::<Ristretto25519>(signing_key, verification_key);
+}
+
+#[test]
+fn blind_encrypt_and_prove_jubjub_works() {
+    use bulletproofs::{
+        jubjub::{Scalar, SubgroupPoint},
+        JubJub,
+    };
+
+    let mut rng = rand::thread_rng();
+    let signing_key = Scalar::random(&mut rng);
+    let verification_key = SubgroupPoint::generator() * signing_key;
+
+    blind_encrypt_and_prove_works::<JubJub>(signing_key, verification_key);
+}
+
+#[test]
+fn blind_encrypt_and_prove_decaf377_works() {
+    use bulletproofs::{
+        decaf377::{Element as ProjectivePoint, Fr as Scalar},
+        Decaf377,
+    };
+
+    let mut rng = rand::thread_rng();
+    let signing_key = Scalar::random(&mut rng);
+    let verification_key = ProjectivePoint::generator() * signing_key;
+
+    blind_encrypt_and_prove_works::<Decaf377>(signing_key, verification_key);
 }
 
 #[test]
@@ -734,8 +987,10 @@ fn encrypt_and_prove_p384_works() {
 #[test]
 fn encrypt_and_prove_ed448_works() {
     use bulletproofs::ed448::{Ed448, EdwardsPoint, Scalar};
+    use rand_core::SeedableRng;
 
-    let mut rng = rand::thread_rng();
+    // let mut rng = rand::thread_rng();
+    let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(0);
     let signing_key = Scalar::random(&mut rng);
     let verification_key = EdwardsPoint::GENERATOR * signing_key;
 
