@@ -122,7 +122,8 @@ mod tests {
         let decryption_key = C::Scalar::random(&mut rng);
         let encryption_key = C::Point::generator() * decryption_key;
 
-        let (ciphertext, _) = C::encrypt_and_prove(encryption_key, &signing_key, &[], &mut rng);
+        let (ciphertext, _) =
+            C::encrypt_and_prove(encryption_key, &signing_key, &[], None, &mut rng);
         let dk = IdentifierPrimeField(decryption_key);
         let shares = bulletproofs::vsss_rs::shamir::split_secret(2, 3, &dk, &mut rng).unwrap();
 
@@ -130,7 +131,8 @@ mod tests {
         let decryption_share2 = DecryptionShare::<C>::new(&shares[1], &ciphertext);
 
         let signing_key2 =
-            C::decrypt_with_shares(&[decryption_share1, decryption_share2], &ciphertext).unwrap();
+            C::decrypt_with_shares(&[decryption_share1, decryption_share2], &ciphertext, None)
+                .unwrap();
         assert_eq!(signing_key, signing_key2);
     }
 
@@ -156,7 +158,8 @@ mod tests {
         let encryption_key = C::Point::generator() * decryption_key;
 
         let dk = IdentifierPrimeField(decryption_key);
-        let (ciphertext, _) = C::encrypt_and_prove(encryption_key, &signing_key, &[], &mut rng);
+        let (ciphertext, _) =
+            C::encrypt_and_prove(encryption_key, &signing_key, &[], None, &mut rng);
         let shares = bulletproofs::vsss_rs::shamir::split_secret(2, 3, &dk, &mut rng).unwrap();
 
         let decryption_share1 = DecryptionShare::<C>::new(&shares[0], &ciphertext);

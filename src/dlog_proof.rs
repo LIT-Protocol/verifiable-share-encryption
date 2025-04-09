@@ -1,7 +1,5 @@
 use bulletproofs::{
-    group::{ff::Field, Group},
-    merlin::Transcript,
-    BulletproofCurveArithmetic, TranscriptProtocol,
+    group::ff::Field, merlin::Transcript, BulletproofCurveArithmetic, TranscriptProtocol,
 };
 use core::fmt::{self, Display, Formatter, LowerHex, UpperHex};
 use elliptic_curve_tools::{group, prime_field};
@@ -93,22 +91,23 @@ impl<C: BulletproofCurveArithmetic> DlogProof<C> {
         encryption_key: C::Point,
         key_share: &C::Scalar,
         r: &C::Scalar,
+        generator: C::Point,
         transcript: &mut Transcript,
         mut rng: impl RngCore,
     ) -> DlogProofCommitting<C> {
-        let pk_x = C::Point::generator() * key_share;
+        let pk_x = generator * key_share;
 
-        let c1 = C::Point::generator() * r;
+        let c1 = generator * r;
         let c2 = pk_x + encryption_key * r;
 
         let r1 = C::Scalar::random(&mut rng);
         let r2 = C::Scalar::random(&mut rng);
 
-        let a1 = C::Point::generator() * r1;
+        let a1 = generator * r1;
         let a2 = encryption_key * r2;
-        let a3 = C::Point::generator() * r2;
+        let a3 = generator * r2;
 
-        transcript.append_point::<C>(b"G", &C::Point::generator());
+        transcript.append_point::<C>(b"G", &generator);
         transcript.append_point::<C>(b"Y", &encryption_key);
         transcript.append_point::<C>(b"C1", &c1);
         transcript.append_point::<C>(b"C2", &c2);
