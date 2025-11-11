@@ -19,12 +19,12 @@ pub use bulletproofs::vsss_rs;
 #[cfg(feature = "v1")]
 pub use legacy_vsss_rs;
 
-use bulletproofs::jubjub::Scalar;
 use bulletproofs::{
     group::{
         ff::{Field, PrimeField},
         Group,
     },
+    jubjub,
     merlin::Transcript,
     vsss_rs::ReadableShareSet,
     BulletproofCurveArithmetic, BulletproofGens, PedersenGens, RangeProof, TranscriptProtocol,
@@ -552,6 +552,42 @@ impl VerifiableEncryption for bulletproofs::Decaf377 {
 
 impl VerifiableEncryptionDecryptor for bulletproofs::Decaf377 {}
 
+impl VerifiableEncryption for bulletproofs::pasta::pallas::Pallas {
+    fn secret_blinders(
+        secret_blinder: &Self::Scalar,
+        rng: impl RngCore + CryptoRng,
+    ) -> Vec<Self::Scalar> {
+        secret_blinders_le::<Self>(secret_blinder, rng)
+    }
+
+    fn verify_bytes_with_discrete_log(
+        ciphertext: &Ciphertext<Self>,
+        proof: &Proof<Self>,
+    ) -> Result<()> {
+        verify_bytes_with_discrete_log_le::<Self>(ciphertext, proof)
+    }
+}
+
+impl VerifiableEncryptionDecryptor for bulletproofs::pasta::pallas::Pallas {}
+
+impl VerifiableEncryption for bulletproofs::pasta::vesta::Vesta {
+    fn secret_blinders(
+        secret_blinder: &Self::Scalar,
+        rng: impl RngCore + CryptoRng,
+    ) -> Vec<Self::Scalar> {
+        secret_blinders_le::<Self>(secret_blinder, rng)
+    }
+
+    fn verify_bytes_with_discrete_log(
+        ciphertext: &Ciphertext<Self>,
+        proof: &Proof<Self>,
+    ) -> Result<()> {
+        verify_bytes_with_discrete_log_le::<Self>(ciphertext, proof)
+    }
+}
+
+impl VerifiableEncryptionDecryptor for bulletproofs::pasta::vesta::Vesta {}
+
 pub trait KeyToScalar {
     type Curve: BulletproofCurveArithmetic;
 
@@ -732,7 +768,7 @@ fn blind_encrypt_and_prove_jubjub_alt_works() {
     };
     use group::cofactor::CofactorGroup;
 
-    pub const SPENDAUTHSIG_BASEPOINT_BYTES: [u8; 32] = [
+    const SPENDAUTHSIG_BASEPOINT_BYTES: [u8; 32] = [
         48, 181, 242, 170, 173, 50, 86, 48, 188, 221, 219, 206, 77, 103, 101, 109, 5, 253, 28, 194,
         208, 55, 187, 83, 117, 182, 233, 109, 158, 1, 161, 215,
     ];
@@ -743,7 +779,7 @@ fn blind_encrypt_and_prove_jubjub_alt_works() {
     let generator = pt.into_subgroup().unwrap();
 
     let mut rng = rand::thread_rng();
-    let signing_key = Scalar::random(&mut rng);
+    let signing_key = jubjub::Scalar::random(&mut rng);
 
     blind_encrypt_and_prove_works::<JubJub>(signing_key, generator);
 }
@@ -759,6 +795,25 @@ fn blind_encrypt_and_prove_decaf377_works() {
     let signing_key = Scalar::random(&mut rng);
 
     blind_encrypt_and_prove_works::<Decaf377>(signing_key, ProjectivePoint::generator());
+}
+
+#[test]
+fn blind_encrypt_and_prove_pallas_works() {
+    use bulletproofs::pasta::pallas::{Affine, Pallas, Point, Scalar};
+    use group::GroupEncoding;
+
+    // Reproducible by pallas::Point::hash_to_curve("z.cash:Orchard")(b"G").to_bytes()
+    const SPENDAUTHSIG_BASEPOINT_BYTES: [u8; 32] = [
+        99, 201, 117, 184, 132, 114, 26, 141, 12, 161, 112, 123, 227, 12, 127, 12, 95, 68, 95, 62,
+        124, 24, 141, 59, 6, 214, 241, 40, 179, 35, 85, 183,
+    ];
+    let generator: Point = Affine::from_bytes(&(SPENDAUTHSIG_BASEPOINT_BYTES.into()))
+        .unwrap()
+        .into();
+
+    let mut rng = rand::thread_rng();
+    let signing_key = Scalar::random(&mut rng);
+    blind_encrypt_and_prove_works::<Pallas>(signing_key, generator);
 }
 
 #[test]
@@ -1037,7 +1092,6 @@ fn encrypt_and_prove_p384_works() {
 #[test]
 fn encrypt_and_prove_ed448_works() {
     use bulletproofs::ed448::{Ed448, EdwardsPoint, Scalar};
-    use rand_core::SeedableRng;
 
     let mut rng = rand::thread_rng();
     let signing_key = Scalar::random(&mut rng);
