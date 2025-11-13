@@ -1,5 +1,6 @@
-use bulletproofs::{group::Group, BulletproofCurveArithmetic};
+use bulletproofs::BulletproofCurveArithmetic;
 use core::fmt::{self, Display, Formatter, LowerHex, UpperHex};
+use lit_rust_crypto::group::Group;
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 
@@ -110,7 +111,7 @@ impl<C: BulletproofCurveArithmetic> Ciphertext<C> {
 
 #[test]
 fn serialize_test() {
-    use bulletproofs::p256::{NistP256, ProjectivePoint};
+    use lit_rust_crypto::p256::{NistP256, ProjectivePoint};
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
 

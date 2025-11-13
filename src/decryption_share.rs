@@ -1,7 +1,7 @@
-use bulletproofs::{
+use bulletproofs::BulletproofCurveArithmetic;
+use lit_rust_crypto::{
     group::GroupEncoding,
     vsss_rs::{DefaultShare, IdentifierPrimeField, ValueGroup},
-    BulletproofCurveArithmetic,
 };
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
@@ -51,7 +51,7 @@ impl<
     > From<DecryptionShare<C>> for crate::v1::DecryptionShare<P, C>
 {
     fn from(value: DecryptionShare<C>) -> Self {
-        use bulletproofs::group::ff::PrimeField;
+        use lit_rust_crypto::ff::PrimeField;
 
         let repr = C::Point::default().to_bytes();
         let share_len = repr.as_ref().len();
@@ -101,22 +101,21 @@ impl<C: VerifiableEncryption + VerifiableEncryptionDecryptor> DecryptionShare<C>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lit_rust_crypto::{ff::Field, group::Group, *};
     use rstest::*;
 
     #[rstest]
-    #[case::k256(bulletproofs::k256::Secp256k1)]
-    #[case::p256(bulletproofs::p256::NistP256)]
-    #[case::p384(bulletproofs::p384::NistP384)]
+    #[case::k256(k256::Secp256k1)]
+    #[case::p256(p256::NistP256)]
+    #[case::p384(p384::NistP384)]
     #[case::ristretto25519(bulletproofs::Ristretto25519)]
     #[case::ed25519(bulletproofs::Ed25519)]
-    #[case::bls12_381(bulletproofs::bls12_381_plus::Bls12381G1)]
-    #[case::bls12_381_std(bulletproofs::blstrs_plus::Bls12381G1)]
-    #[case::ed448(bulletproofs::ed448::Ed448)]
+    #[case::bls12_381(bls12_381_plus::Bls12381G1)]
+    #[case::bls12_381_std(blstrs_plus::Bls12381G1)]
+    #[case::ed448(ed448_goldilocks::Ed448)]
     fn decryption_share_test<C: VerifiableEncryption + VerifiableEncryptionDecryptor>(
         #[case] _c: C,
     ) {
-        use bulletproofs::group::{ff::Field, Group};
-
         let mut rng = rand::thread_rng();
         let signing_key = C::Scalar::random(&mut rng);
         let decryption_key = C::Scalar::random(&mut rng);
@@ -125,7 +124,7 @@ mod tests {
         let (ciphertext, _) =
             C::encrypt_and_prove(encryption_key, &signing_key, &[], None, &mut rng);
         let dk = IdentifierPrimeField(decryption_key);
-        let shares = bulletproofs::vsss_rs::shamir::split_secret(2, 3, &dk, &mut rng).unwrap();
+        let shares = vsss_rs::shamir::split_secret(2, 3, &dk, &mut rng).unwrap();
 
         let decryption_share1 = DecryptionShare::<C>::new(&shares[0], &ciphertext);
         let decryption_share2 = DecryptionShare::<C>::new(&shares[1], &ciphertext);
@@ -137,21 +136,19 @@ mod tests {
     }
 
     #[rstest]
-    #[case::k256(bulletproofs::k256::Secp256k1)]
-    #[case::p256(bulletproofs::p256::NistP256)]
-    #[case::p384(bulletproofs::p384::NistP384)]
+    #[case::k256(k256::Secp256k1)]
+    #[case::p256(p256::NistP256)]
+    #[case::p384(p384::NistP384)]
     #[case::ristretto25519(bulletproofs::Ristretto25519)]
     #[case::ed25519(bulletproofs::Ed25519)]
-    #[case::bls12_381(bulletproofs::bls12_381_plus::Bls12381G1)]
-    #[case::bls12_381_std(bulletproofs::blstrs_plus::Bls12381G1)]
-    #[case::ed448(bulletproofs::ed448::Ed448)]
+    #[case::bls12_381(bls12_381_plus::Bls12381G1)]
+    #[case::bls12_381_std(blstrs_plus::Bls12381G1)]
+    #[case::ed448(ed448_goldilocks::Ed448)]
     fn decryption_share_serialize_test<
         C: VerifiableEncryption + VerifiableEncryptionDecryptor + PartialEq,
     >(
         #[case] _c: C,
     ) {
-        use bulletproofs::group::{ff::Field, Group};
-
         let mut rng = rand::thread_rng();
         let signing_key = C::Scalar::random(&mut rng);
         let decryption_key = C::Scalar::random(&mut rng);
@@ -160,7 +157,7 @@ mod tests {
         let dk = IdentifierPrimeField(decryption_key);
         let (ciphertext, _) =
             C::encrypt_and_prove(encryption_key, &signing_key, &[], None, &mut rng);
-        let shares = bulletproofs::vsss_rs::shamir::split_secret(2, 3, &dk, &mut rng).unwrap();
+        let shares = vsss_rs::shamir::split_secret(2, 3, &dk, &mut rng).unwrap();
 
         let decryption_share1 = DecryptionShare::<C>::new(&shares[0], &ciphertext);
 

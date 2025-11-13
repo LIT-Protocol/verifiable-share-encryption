@@ -12,14 +12,16 @@ pub use dlog_proof::*;
 pub use proof::*;
 
 use bulletproofs::{
-    group::{
-        ff::{Field, PrimeField},
-        Group,
-    },
-    merlin::Transcript,
-    BulletproofCurveArithmetic, BulletproofGens, PedersenGens, RangeProof, TranscriptProtocol,
+    merlin::Transcript, BulletproofCurveArithmetic, BulletproofGens, PedersenGens, RangeProof,
+    TranscriptProtocol,
 };
 use legacy_vsss_rs::Share;
+use lit_rust_crypto::{
+    bls12_381_plus, blstrs_plus,
+    ff::{Field, PrimeField},
+    group::Group,
+    k256, p256,
+};
 use rand_core::{CryptoRng, RngCore};
 
 use crate::{Error, Result};
@@ -302,13 +304,13 @@ pub trait VerifiableEncryptionDecryptor: BulletproofCurveArithmetic {
     }
 }
 
-impl VerifiableEncryption for bulletproofs::k256::Secp256k1 {}
+impl VerifiableEncryption for k256::Secp256k1 {}
 
-impl VerifiableEncryptionDecryptor for bulletproofs::k256::Secp256k1 {}
+impl VerifiableEncryptionDecryptor for k256::Secp256k1 {}
 
-impl VerifiableEncryption for bulletproofs::p256::NistP256 {}
+impl VerifiableEncryption for p256::NistP256 {}
 
-impl VerifiableEncryptionDecryptor for bulletproofs::p256::NistP256 {}
+impl VerifiableEncryptionDecryptor for p256::NistP256 {}
 
 impl VerifiableEncryption for bulletproofs::Ristretto25519 {}
 
@@ -318,10 +320,10 @@ impl VerifiableEncryption for bulletproofs::Ed25519 {}
 
 impl VerifiableEncryptionDecryptor for bulletproofs::Ed25519 {}
 
-impl VerifiableEncryption for bulletproofs::bls12_381_plus::Bls12381G1 {}
+impl VerifiableEncryption for bls12_381_plus::Bls12381G1 {}
 
-impl VerifiableEncryptionDecryptor for bulletproofs::bls12_381_plus::Bls12381G1 {}
+impl VerifiableEncryptionDecryptor for bls12_381_plus::Bls12381G1 {}
 
-impl VerifiableEncryption for bulletproofs::blstrs_plus::Bls12381G1 {}
+impl VerifiableEncryption for blstrs_plus::Bls12381G1 {}
 
-impl VerifiableEncryptionDecryptor for bulletproofs::blstrs_plus::Bls12381G1 {}
+impl VerifiableEncryptionDecryptor for blstrs_plus::Bls12381G1 {}

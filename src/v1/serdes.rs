@@ -1,5 +1,6 @@
-use bulletproofs::{group::Group, BulletproofCurveArithmetic};
+use bulletproofs::BulletproofCurveArithmetic;
 use core::marker::PhantomData;
+use lit_rust_crypto::group::Group;
 use serde::de::{SeqAccess, Visitor};
 use serde::ser::SerializeTuple;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};

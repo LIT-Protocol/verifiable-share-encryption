@@ -14,25 +14,26 @@ pub use dlog_proof::*;
 pub use errors::*;
 pub use proof::*;
 
-pub use bulletproofs::vsss_rs;
+pub use lit_rust_crypto;
 
 #[cfg(feature = "v1")]
 pub use legacy_vsss_rs;
 
 use bulletproofs::{
-    group::{
-        ff::{Field, PrimeField},
-        Group,
-    },
-    jubjub,
-    merlin::Transcript,
+    merlin::Transcript, BulletproofCurveArithmetic, BulletproofGens, PedersenGens, RangeProof,
+    TranscriptProtocol,
+};
+#[cfg(test)]
+use lit_rust_crypto::vsss_rs::{self, shamir, DefaultShare, IdentifierPrimeField};
+use lit_rust_crypto::{
+    bls12_381_plus, blstrs_plus, ed448_goldilocks,
+    ff::{Field, PrimeField},
+    group::Group,
+    k256, p256, p384, pallas, vesta,
     vsss_rs::ReadableShareSet,
-    BulletproofCurveArithmetic, BulletproofGens, PedersenGens, RangeProof, TranscriptProtocol,
 };
 use rand_core::{CryptoRng, RngCore};
 use std::ops::Deref;
-#[cfg(test)]
-use vsss_rs::{shamir, DefaultShare, IdentifierPrimeField};
 
 /// A trait for types that can use ElGamal encryption scheme for a scalar
 pub trait VerifiableEncryption: BulletproofCurveArithmetic {
@@ -348,7 +349,7 @@ pub trait VerifiableEncryptionDecryptor: BulletproofCurveArithmetic {
     }
 }
 
-impl VerifiableEncryption for bulletproofs::k256::Secp256k1 {
+impl VerifiableEncryption for k256::Secp256k1 {
     fn secret_blinders(
         secret_blinder: &Self::Scalar,
         rng: impl RngCore + CryptoRng,
@@ -364,9 +365,9 @@ impl VerifiableEncryption for bulletproofs::k256::Secp256k1 {
     }
 }
 
-impl VerifiableEncryptionDecryptor for bulletproofs::k256::Secp256k1 {}
+impl VerifiableEncryptionDecryptor for k256::Secp256k1 {}
 
-impl VerifiableEncryption for bulletproofs::p256::NistP256 {
+impl VerifiableEncryption for p256::NistP256 {
     fn secret_blinders(
         secret_blinder: &Self::Scalar,
         rng: impl RngCore + CryptoRng,
@@ -382,7 +383,7 @@ impl VerifiableEncryption for bulletproofs::p256::NistP256 {
     }
 }
 
-impl VerifiableEncryptionDecryptor for bulletproofs::p256::NistP256 {}
+impl VerifiableEncryptionDecryptor for p256::NistP256 {}
 
 impl VerifiableEncryption for bulletproofs::Ristretto25519 {
     fn secret_blinders(
@@ -420,7 +421,7 @@ impl VerifiableEncryption for bulletproofs::Ed25519 {
 
 impl VerifiableEncryptionDecryptor for bulletproofs::Ed25519 {}
 
-impl VerifiableEncryption for bulletproofs::bls12_381_plus::Bls12381G1 {
+impl VerifiableEncryption for bls12_381_plus::Bls12381G1 {
     fn secret_blinders(
         secret_blinder: &Self::Scalar,
         rng: impl RngCore + CryptoRng,
@@ -436,9 +437,9 @@ impl VerifiableEncryption for bulletproofs::bls12_381_plus::Bls12381G1 {
     }
 }
 
-impl VerifiableEncryptionDecryptor for bulletproofs::bls12_381_plus::Bls12381G1 {}
+impl VerifiableEncryptionDecryptor for bls12_381_plus::Bls12381G1 {}
 
-impl VerifiableEncryption for bulletproofs::blstrs_plus::Bls12381G1 {
+impl VerifiableEncryption for blstrs_plus::Bls12381G1 {
     fn secret_blinders(
         secret_blinder: &Self::Scalar,
         rng: impl RngCore + CryptoRng,
@@ -454,9 +455,9 @@ impl VerifiableEncryption for bulletproofs::blstrs_plus::Bls12381G1 {
     }
 }
 
-impl VerifiableEncryptionDecryptor for bulletproofs::blstrs_plus::Bls12381G1 {}
+impl VerifiableEncryptionDecryptor for blstrs_plus::Bls12381G1 {}
 
-impl VerifiableEncryption for bulletproofs::p384::NistP384 {
+impl VerifiableEncryption for p384::NistP384 {
     fn scalar_to_verifiable_encryption_bytes(scalar: &Self::Scalar) -> Vec<u8> {
         let mut bytes = vec![0u8; 64];
         bytes[16..].copy_from_slice(scalar.to_repr().as_ref());
@@ -478,7 +479,7 @@ impl VerifiableEncryption for bulletproofs::p384::NistP384 {
     }
 }
 
-impl VerifiableEncryptionDecryptor for bulletproofs::p384::NistP384 {
+impl VerifiableEncryptionDecryptor for p384::NistP384 {
     fn verifiable_encryption_bytes_to_scalar(bytes: &[u8]) -> Result<Self::Scalar> {
         let mut repr = <Self::Scalar as PrimeField>::Repr::default();
         repr.copy_from_slice(&bytes[16..]);
@@ -486,7 +487,7 @@ impl VerifiableEncryptionDecryptor for bulletproofs::p384::NistP384 {
     }
 }
 
-impl VerifiableEncryption for bulletproofs::ed448::Ed448 {
+impl VerifiableEncryption for ed448_goldilocks::Ed448 {
     fn scalar_to_verifiable_encryption_bytes(scalar: &Self::Scalar) -> Vec<u8> {
         let mut bytes = vec![0u8; 64];
         bytes[..57].copy_from_slice(scalar.to_repr().as_ref());
@@ -508,7 +509,7 @@ impl VerifiableEncryption for bulletproofs::ed448::Ed448 {
     }
 }
 
-impl VerifiableEncryptionDecryptor for bulletproofs::ed448::Ed448 {
+impl VerifiableEncryptionDecryptor for ed448_goldilocks::Ed448 {
     fn verifiable_encryption_bytes_to_scalar(bytes: &[u8]) -> Result<Self::Scalar> {
         let mut repr = <Self::Scalar as PrimeField>::Repr::default();
         repr.copy_from_slice(&bytes[..57]);
@@ -552,7 +553,7 @@ impl VerifiableEncryption for bulletproofs::Decaf377 {
 
 impl VerifiableEncryptionDecryptor for bulletproofs::Decaf377 {}
 
-impl VerifiableEncryption for bulletproofs::pasta::pallas::Pallas {
+impl VerifiableEncryption for pallas::Pallas {
     fn secret_blinders(
         secret_blinder: &Self::Scalar,
         rng: impl RngCore + CryptoRng,
@@ -568,9 +569,9 @@ impl VerifiableEncryption for bulletproofs::pasta::pallas::Pallas {
     }
 }
 
-impl VerifiableEncryptionDecryptor for bulletproofs::pasta::pallas::Pallas {}
+impl VerifiableEncryptionDecryptor for pallas::Pallas {}
 
-impl VerifiableEncryption for bulletproofs::pasta::vesta::Vesta {
+impl VerifiableEncryption for vesta::Vesta {
     fn secret_blinders(
         secret_blinder: &Self::Scalar,
         rng: impl RngCore + CryptoRng,
@@ -586,7 +587,7 @@ impl VerifiableEncryption for bulletproofs::pasta::vesta::Vesta {
     }
 }
 
-impl VerifiableEncryptionDecryptor for bulletproofs::pasta::vesta::Vesta {}
+impl VerifiableEncryptionDecryptor for vesta::Vesta {}
 
 pub trait KeyToScalar {
     type Curve: BulletproofCurveArithmetic;
@@ -600,34 +601,34 @@ pub trait KeyToPoint {
     fn key_to_point(&self) -> <Self::Curve as BulletproofCurveArithmetic>::Point;
 }
 
-impl KeyToScalar for bulletproofs::k256::SecretKey {
-    type Curve = bulletproofs::k256::Secp256k1;
+impl KeyToScalar for k256::SecretKey {
+    type Curve = k256::Secp256k1;
 
-    fn key_to_scalar(&self) -> bulletproofs::k256::Scalar {
+    fn key_to_scalar(&self) -> k256::Scalar {
         *self.to_nonzero_scalar().deref()
     }
 }
 
-impl KeyToPoint for bulletproofs::k256::PublicKey {
-    type Curve = bulletproofs::k256::Secp256k1;
+impl KeyToPoint for k256::PublicKey {
+    type Curve = k256::Secp256k1;
 
-    fn key_to_point(&self) -> bulletproofs::k256::ProjectivePoint {
+    fn key_to_point(&self) -> k256::ProjectivePoint {
         self.to_projective()
     }
 }
 
-impl KeyToScalar for bulletproofs::p256::SecretKey {
-    type Curve = bulletproofs::p256::NistP256;
+impl KeyToScalar for p256::SecretKey {
+    type Curve = p256::NistP256;
 
-    fn key_to_scalar(&self) -> bulletproofs::p256::Scalar {
+    fn key_to_scalar(&self) -> p256::Scalar {
         *self.to_nonzero_scalar().deref()
     }
 }
 
-impl KeyToPoint for bulletproofs::p256::PublicKey {
-    type Curve = bulletproofs::p256::NistP256;
+impl KeyToPoint for p256::PublicKey {
+    type Curve = p256::NistP256;
 
-    fn key_to_point(&self) -> bulletproofs::p256::ProjectivePoint {
+    fn key_to_point(&self) -> p256::ProjectivePoint {
         self.to_projective()
     }
 }
@@ -710,7 +711,7 @@ fn verify_bytes_with_discrete_log_be<V: VerifiableEncryption>(
 
 #[test]
 fn blind_encrypt_and_prove_k256_works() {
-    use bulletproofs::k256::{self, Secp256k1, SecretKey};
+    use k256::{self, Secp256k1, SecretKey};
 
     let mut rng = rand::thread_rng();
     let signing_key = SecretKey::random(&mut rng);
@@ -723,7 +724,7 @@ fn blind_encrypt_and_prove_k256_works() {
 
 #[test]
 fn blind_encrypt_and_prove_p256_works() {
-    use bulletproofs::p256::{self, NistP256, SecretKey};
+    use p256::{self, NistP256, SecretKey};
 
     let mut rng = rand::thread_rng();
     let signing_key = SecretKey::random(&mut rng);
@@ -736,10 +737,8 @@ fn blind_encrypt_and_prove_p256_works() {
 
 #[test]
 fn blind_encrypt_and_prove_ristretto25519_works() {
-    use bulletproofs::{
-        vsss_rs::curve25519::{WrappedRistretto, WrappedScalar},
-        Ristretto25519,
-    };
+    use bulletproofs::Ristretto25519;
+    use vsss_rs::curve25519::{WrappedRistretto, WrappedScalar};
 
     let mut rng = rand::thread_rng();
     let signing_key = WrappedScalar::random(&mut rng);
@@ -749,10 +748,8 @@ fn blind_encrypt_and_prove_ristretto25519_works() {
 
 #[test]
 fn blind_encrypt_and_prove_jubjub_works() {
-    use bulletproofs::{
-        jubjub::{Scalar, SubgroupPoint},
-        JubJub,
-    };
+    use bulletproofs::JubJub;
+    use lit_rust_crypto::jubjub::{Scalar, SubgroupPoint};
 
     let mut rng = rand::thread_rng();
     let signing_key = Scalar::random(&mut rng);
@@ -762,11 +759,9 @@ fn blind_encrypt_and_prove_jubjub_works() {
 
 #[test]
 fn blind_encrypt_and_prove_jubjub_alt_works() {
-    use bulletproofs::{
-        jubjub::{AffinePoint, ExtendedPoint},
-        JubJub,
-    };
+    use bulletproofs::JubJub;
     use group::cofactor::CofactorGroup;
+    use lit_rust_crypto::jubjub::{AffinePoint, ExtendedPoint, Scalar};
 
     const SPENDAUTHSIG_BASEPOINT_BYTES: [u8; 32] = [
         48, 181, 242, 170, 173, 50, 86, 48, 188, 221, 219, 206, 77, 103, 101, 109, 5, 253, 28, 194,
@@ -779,17 +774,15 @@ fn blind_encrypt_and_prove_jubjub_alt_works() {
     let generator = pt.into_subgroup().unwrap();
 
     let mut rng = rand::thread_rng();
-    let signing_key = jubjub::Scalar::random(&mut rng);
+    let signing_key = Scalar::random(&mut rng);
 
     blind_encrypt_and_prove_works::<JubJub>(signing_key, generator);
 }
 
 #[test]
 fn blind_encrypt_and_prove_decaf377_works() {
-    use bulletproofs::{
-        decaf377::{Element as ProjectivePoint, Fr as Scalar},
-        Decaf377,
-    };
+    use bulletproofs::Decaf377;
+    use lit_rust_crypto::decaf377::{Element as ProjectivePoint, Fr as Scalar};
 
     let mut rng = rand::thread_rng();
     let signing_key = Scalar::random(&mut rng);
@@ -799,8 +792,8 @@ fn blind_encrypt_and_prove_decaf377_works() {
 
 #[test]
 fn blind_encrypt_and_prove_pallas_works() {
-    use bulletproofs::pasta::pallas::{Affine, Pallas, Point, Scalar};
     use group::GroupEncoding;
+    use lit_rust_crypto::pallas::{Affine, Pallas, Point, Scalar};
 
     // Reproducible by pallas::Point::hash_to_curve("z.cash:Orchard")(b"G").to_bytes()
     const SPENDAUTHSIG_BASEPOINT_BYTES: [u8; 32] = [
@@ -818,10 +811,8 @@ fn blind_encrypt_and_prove_pallas_works() {
 
 #[test]
 fn blind_encrypt_and_prove_ed25519_works() {
-    use bulletproofs::{
-        vsss_rs::curve25519::{WrappedEdwards, WrappedScalar},
-        Ed25519,
-    };
+    use bulletproofs::Ed25519;
+    use lit_rust_crypto::vsss_rs::curve25519::{WrappedEdwards, WrappedScalar};
 
     let mut rng = rand::thread_rng();
     let signing_key = WrappedScalar::random(&mut rng);
@@ -831,7 +822,7 @@ fn blind_encrypt_and_prove_ed25519_works() {
 
 #[test]
 fn blind_encrypt_and_prove_bls12381_works() {
-    use bulletproofs::bls12_381_plus::{Bls12381G1, G1Projective, Scalar};
+    use bls12_381_plus::{Bls12381G1, G1Projective, Scalar};
 
     let mut rng = rand::thread_rng();
     let signing_key = Scalar::random(&mut rng);
@@ -841,7 +832,7 @@ fn blind_encrypt_and_prove_bls12381_works() {
 
 #[test]
 fn blind_encrypt_and_prove_blst12381_works() {
-    use bulletproofs::blstrs_plus::{Bls12381G1, G1Projective, Scalar};
+    use blstrs_plus::{Bls12381G1, G1Projective, Scalar};
 
     let mut rng = rand::thread_rng();
     let signing_key = Scalar::random(&mut rng);
@@ -854,7 +845,7 @@ fn blind_encrypt_and_prove_works<C: VerifiableEncryption + VerifiableEncryptionD
     signing_key: C::Scalar,
     generator: C::Point,
 ) {
-    use bulletproofs::vsss_rs::{shamir, DefaultShare, IdentifierPrimeField};
+    use lit_rust_crypto::vsss_rs::{shamir, DefaultShare, IdentifierPrimeField};
 
     let sk = IdentifierPrimeField(signing_key);
 
@@ -913,7 +904,7 @@ fn blind_encrypt_and_prove_works<C: VerifiableEncryption + VerifiableEncryptionD
 
 #[test]
 fn blind_encrypt_and_proof_random_ids_bls12381_works() {
-    use bulletproofs::blstrs_plus::{Bls12381G1, G1Projective, Scalar};
+    use blstrs_plus::{Bls12381G1, G1Projective, Scalar};
     use rand_core::SeedableRng;
 
     type BlsShare = DefaultShare<IdentifierPrimeField<Scalar>, IdentifierPrimeField<Scalar>>;
@@ -1009,36 +1000,28 @@ fn blind_encrypt_and_proof_random_ids_bls12381_works() {
 
 #[test]
 fn encrypt_and_prove_k256_works() {
-    use bulletproofs::k256::{self, Secp256k1, SecretKey};
+    use k256::{ProjectivePoint, Secp256k1, SecretKey};
 
     let mut rng = rand::thread_rng();
     let signing_key = SecretKey::random(&mut rng);
 
-    encrypt_and_prove_works::<Secp256k1>(
-        signing_key.key_to_scalar(),
-        k256::ProjectivePoint::GENERATOR,
-    );
+    encrypt_and_prove_works::<Secp256k1>(signing_key.key_to_scalar(), ProjectivePoint::GENERATOR);
 }
 
 #[test]
 fn encrypt_and_prove_p256_works() {
-    use bulletproofs::p256::{self, NistP256, SecretKey};
+    use p256::{NistP256, ProjectivePoint, SecretKey};
 
     let mut rng = rand::thread_rng();
     let signing_key = SecretKey::random(&mut rng);
 
-    encrypt_and_prove_works::<NistP256>(
-        signing_key.key_to_scalar(),
-        p256::ProjectivePoint::GENERATOR,
-    );
+    encrypt_and_prove_works::<NistP256>(signing_key.key_to_scalar(), ProjectivePoint::GENERATOR);
 }
 
 #[test]
 fn encrypt_and_prove_ristretto25519_works() {
-    use bulletproofs::{
-        vsss_rs::curve25519::{WrappedRistretto, WrappedScalar},
-        Ristretto25519,
-    };
+    use bulletproofs::Ristretto25519;
+    use lit_rust_crypto::vsss_rs::curve25519::{WrappedRistretto, WrappedScalar};
 
     let mut rng = rand::thread_rng();
     let signing_key = WrappedScalar::random(&mut rng);
@@ -1048,10 +1031,8 @@ fn encrypt_and_prove_ristretto25519_works() {
 
 #[test]
 fn encrypt_and_prove_ed25519_works() {
-    use bulletproofs::{
-        vsss_rs::curve25519::{WrappedEdwards, WrappedScalar},
-        Ed25519,
-    };
+    use bulletproofs::Ed25519;
+    use lit_rust_crypto::vsss_rs::curve25519::{WrappedEdwards, WrappedScalar};
 
     let mut rng = rand::thread_rng();
     let signing_key = WrappedScalar::random(&mut rng);
@@ -1061,7 +1042,7 @@ fn encrypt_and_prove_ed25519_works() {
 
 #[test]
 fn encrypt_and_prove_bls12381_works() {
-    use bulletproofs::bls12_381_plus::{Bls12381G1, G1Projective, Scalar};
+    use bls12_381_plus::{Bls12381G1, G1Projective, Scalar};
 
     let mut rng = rand::thread_rng();
     let signing_key = Scalar::random(&mut rng);
@@ -1071,7 +1052,7 @@ fn encrypt_and_prove_bls12381_works() {
 
 #[test]
 fn encrypt_and_prove_blst12381_works() {
-    use bulletproofs::blstrs_plus::{Bls12381G1, G1Projective, Scalar};
+    use blstrs_plus::{Bls12381G1, G1Projective, Scalar};
 
     let mut rng = rand::thread_rng();
     let signing_key = Scalar::random(&mut rng);
@@ -1081,7 +1062,7 @@ fn encrypt_and_prove_blst12381_works() {
 
 #[test]
 fn encrypt_and_prove_p384_works() {
-    use bulletproofs::p384::{NistP384, ProjectivePoint, Scalar};
+    use p384::{NistP384, ProjectivePoint, Scalar};
 
     let mut rng = rand::thread_rng();
     let signing_key = Scalar::random(&mut rng);
@@ -1091,7 +1072,7 @@ fn encrypt_and_prove_p384_works() {
 
 #[test]
 fn encrypt_and_prove_ed448_works() {
-    use bulletproofs::ed448::{Ed448, EdwardsPoint, Scalar};
+    use ed448_goldilocks::{Ed448, EdwardsPoint, Scalar};
 
     let mut rng = rand::thread_rng();
     let signing_key = Scalar::random(&mut rng);
@@ -1104,8 +1085,6 @@ fn encrypt_and_prove_works<C: VerifiableEncryption + VerifiableEncryptionDecrypt
     signing_key: C::Scalar,
     generator: C::Point,
 ) {
-    use bulletproofs::vsss_rs::{shamir, DefaultShare, IdentifierPrimeField};
-
     let mut rng = rand::thread_rng();
     let sk = IdentifierPrimeField(signing_key);
     let shares = shamir::split_secret::<
@@ -1141,12 +1120,12 @@ fn encrypt_and_prove_works<C: VerifiableEncryption + VerifiableEncryptionDecrypt
 
 #[test]
 fn k256_proof_serde_works() {
-    ciphertext_proof_serde_works::<bulletproofs::k256::Secp256k1>();
+    ciphertext_proof_serde_works::<k256::Secp256k1>();
 }
 
 #[test]
 fn p256_proof_serde_works() {
-    ciphertext_proof_serde_works::<bulletproofs::p256::NistP256>();
+    ciphertext_proof_serde_works::<p256::NistP256>();
 }
 
 #[test]
@@ -1161,17 +1140,17 @@ fn ed25519_proof_serde_works() {
 
 #[test]
 fn bls12381_proof_serde_works() {
-    ciphertext_proof_serde_works::<bulletproofs::bls12_381_plus::Bls12381G1>();
+    ciphertext_proof_serde_works::<bls12_381_plus::Bls12381G1>();
 }
 
 #[test]
 fn blst12381_proof_serde_works() {
-    ciphertext_proof_serde_works::<bulletproofs::blstrs_plus::Bls12381G1>();
+    ciphertext_proof_serde_works::<blstrs_plus::Bls12381G1>();
 }
 
 #[test]
 fn ed448_proof_serde_works() {
-    ciphertext_proof_serde_works::<bulletproofs::ed448::Ed448>();
+    ciphertext_proof_serde_works::<ed448_goldilocks::Ed448>();
 }
 
 #[cfg(test)]

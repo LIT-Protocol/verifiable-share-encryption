@@ -1,6 +1,6 @@
-use bulletproofs::group::GroupEncoding;
 use bulletproofs::BulletproofCurveArithmetic;
 use legacy_vsss_rs::Share;
+use lit_rust_crypto::group::GroupEncoding;
 use serde::{ser::SerializeTuple, Deserialize, Deserializer, Serialize, Serializer};
 use std::marker::PhantomData;
 
@@ -264,12 +264,12 @@ pub(crate) fn default_shares<P: Share<Identifier = u8>>(size: usize) -> [P; 32] 
 
 #[test]
 fn decryption_share_test_k256() {
-    decryption_share_test::<bulletproofs::k256::Secp256k1>()
+    decryption_share_test::<lit_rust_crypto::k256::Secp256k1>()
 }
 
 #[test]
 fn decryption_share_test_p256() {
-    decryption_share_test::<bulletproofs::p256::NistP256>()
+    decryption_share_test::<lit_rust_crypto::p256::NistP256>()
 }
 
 #[test]
@@ -279,17 +279,17 @@ fn decryption_share_test_ristretto25519() {
 
 #[test]
 fn decryption_share_test_bls12_381() {
-    decryption_share_test::<bulletproofs::bls12_381_plus::Bls12381G1>()
+    decryption_share_test::<lit_rust_crypto::bls12_381_plus::Bls12381G1>()
 }
 
 #[test]
 fn decryption_share_test_bls12_381_std() {
-    decryption_share_test::<bulletproofs::blstrs_plus::Bls12381G1>()
+    decryption_share_test::<lit_rust_crypto::blstrs_plus::Bls12381G1>()
 }
 
 #[cfg(test)]
 fn decryption_share_test<C: VerifiableEncryption + VerifiableEncryptionDecryptor>() {
-    use bulletproofs::group::{ff::Field, Group};
+    use lit_rust_crypto::group::{ff::Field, Group};
 
     let mut rng = rand::thread_rng();
     let signing_key = C::Scalar::random(&mut rng);
@@ -310,12 +310,12 @@ fn decryption_share_test<C: VerifiableEncryption + VerifiableEncryptionDecryptor
 
 #[test]
 fn decryption_share_serialize_test_k256() {
-    decryption_share_serialize_test::<bulletproofs::k256::Secp256k1>()
+    decryption_share_serialize_test::<lit_rust_crypto::k256::Secp256k1>()
 }
 
 #[test]
 fn decryption_share_serialize_test_p256() {
-    decryption_share_serialize_test::<bulletproofs::p256::NistP256>()
+    decryption_share_serialize_test::<lit_rust_crypto::p256::NistP256>()
 }
 
 #[test]
@@ -325,19 +325,19 @@ fn decryption_share_serialize_test_ristretto25519() {
 
 #[test]
 fn decryption_share_serialize_test_bls12_381() {
-    decryption_share_serialize_test::<bulletproofs::bls12_381_plus::Bls12381G1>()
+    decryption_share_serialize_test::<lit_rust_crypto::bls12_381_plus::Bls12381G1>()
 }
 
 #[test]
 fn decryption_share_serialize_test_bls12_381_std() {
-    decryption_share_serialize_test::<bulletproofs::blstrs_plus::Bls12381G1>()
+    decryption_share_serialize_test::<lit_rust_crypto::blstrs_plus::Bls12381G1>()
 }
 
 #[cfg(test)]
 fn decryption_share_serialize_test<
     C: VerifiableEncryption + VerifiableEncryptionDecryptor + PartialEq,
 >() {
-    use bulletproofs::group::{ff::Field, Group};
+    use lit_rust_crypto::group::{ff::Field, Group};
 
     let mut rng = rand::thread_rng();
     let signing_key = C::Scalar::random(&mut rng);

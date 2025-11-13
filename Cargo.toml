@@ -36,6 +36,14 @@ rand_core = { version = "0.6.4", features = ["std"] }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0"
 
+[dependencies.lit-rust-crypto]
+git = "https://github.com/LIT-Protocol/lit-rust-crypto"
+tag = "0.5.0"
+features = [
+    "default",
+    "bls12_381_plus",
+]
+
 [dev-dependencies]
 group = "0.13.0"
 hex = "0.4"

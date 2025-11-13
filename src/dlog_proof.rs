@@ -1,8 +1,7 @@
-use bulletproofs::{
-    group::ff::Field, merlin::Transcript, BulletproofCurveArithmetic, TranscriptProtocol,
-};
+use bulletproofs::{merlin::Transcript, BulletproofCurveArithmetic, TranscriptProtocol};
 use core::fmt::{self, Display, Formatter, LowerHex, UpperHex};
 use elliptic_curve_tools::{group, prime_field};
+use lit_rust_crypto::ff::Field;
 use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
 
@@ -211,7 +210,7 @@ impl<C: BulletproofCurveArithmetic> DlogProof<C> {
 
 #[test]
 fn serialize_works() {
-    use bulletproofs::k256::{ProjectivePoint, Scalar, Secp256k1};
+    use lit_rust_crypto::k256::{ProjectivePoint, Scalar, Secp256k1};
 
     let dlog_proof = DlogProof::<Secp256k1> {
         c1: ProjectivePoint::GENERATOR,
