@@ -322,7 +322,7 @@ dependencies = [
 [[package]]
 name = "bulletproofs"
 version = "4.0.0"
-source = "git+https://github.com/LIT-Protocol/bulletproofs.git?branch=pallas#215e9d031fed7b8701a1ecffbf91e53aae7f509d"
+source = "git+https://github.com/LIT-Protocol/bulletproofs.git?branch=pallas#2ee66a6e2770c73514942936950c0ca2dbbcd023"
 dependencies = [
  "blake2",
  "byteorder",
@@ -935,9 +935,9 @@ checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
 name = "jubjub-plus"
-version = "0.10.8"
+version = "0.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c2c5e88d1ac6a903e693287073860ea35299b200273d5c2bd9d7845ec39f319"
+checksum = "b0fcad3e0c0304ef9feef976239c7972da3b91008a0d6d2d577d632a215b73b9"
 dependencies = [
  "bitvec",
  "bls12_381_plus",
@@ -993,8 +993,8 @@ checksum = "c19937216e9d3aa9956d9bb8dfc0b0c8beb6058fc4f7a4dc4d850edf86a237d6"
 
 [[package]]
 name = "lit-rust-crypto"
-version = "0.5.0"
-source = "git+https://github.com/LIT-Protocol/lit-rust-crypto?tag=0.5.0#0b3e4d5a9811ce151da83cab4835cf5631c9a5c3"
+version = "0.6.0"
+source = "git+https://github.com/LIT-Protocol/lit-rust-crypto?tag=0.6.0#9548fce521473f289ea1366249b782355e96507d"
 dependencies = [
  "bls12_381_plus",
  "blsful",
@@ -1183,9 +1183,9 @@ dependencies = [
 
 [[package]]
 name = "pasta_curves_plus"
-version = "0.5.1"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bacb1f6f3ee2acc4eceb7503270053a233abfd48a1160f555b0bc30389e0917"
+checksum = "42e265b7ebdbfc61a8c0eeac79350cf3225cd390325dc91dd0edede5b6742d58"
 dependencies = [
  "blake2",
  "blake2b_simd",

@@ -38,7 +38,7 @@ thiserror = "2.0"
 
 [dependencies.lit-rust-crypto]
 git = "https://github.com/LIT-Protocol/lit-rust-crypto"
-tag = "0.5.0"
+tag = "0.6.0"
 features = [
     "default",
     "bls12_381_plus",
