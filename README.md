@@ -1,3 +1,10 @@
+<!-- lit-archived-banner -->
+> ⚠️ **This repository is archived and is no longer maintained.**
+>
+> Lit Protocol has kept it publicly available for **educational and reference purposes only**. Code here may be out of date and is not supported.
+
+---
+
 # Verifiable Share Encryption
 
 Verifiable Encryption was first proposed by Jan Camenisch and Victor Shoup in [2003](https://www.shoup.net/papers/verenc.pdf). 
